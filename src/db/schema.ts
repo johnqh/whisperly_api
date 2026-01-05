@@ -12,6 +12,11 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 import { createRateLimitCountersTable } from "@sudobility/ratelimit_service";
+import {
+  createEntitiesTable,
+  createEntityMembersTable,
+  createEntityInvitationsTable,
+} from "@sudobility/entity_service";
 
 // Create the whisperly schema
 export const whisperlySchema = pgSchema("whisperly");
@@ -40,7 +45,15 @@ export const users = whisperlySchema.table("users", {
 });
 
 // =============================================================================
-// User Settings Table
+// Entity Tables (from @sudobility/entity_service)
+// =============================================================================
+
+export const entities = createEntitiesTable(whisperlySchema, "whisperly");
+export const entityMembers = createEntityMembersTable(whisperlySchema, "whisperly");
+export const entityInvitations = createEntityInvitationsTable(whisperlySchema, "whisperly");
+
+// =============================================================================
+// User Settings Table (DEPRECATED - will be removed after entity migration)
 // =============================================================================
 
 export const userSettings = whisperlySchema.table("user_settings", {
@@ -68,6 +81,7 @@ export const projects = whisperlySchema.table(
     user_id: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    entity_id: uuid("entity_id").references(() => entities.id, { onDelete: "cascade" }),
     project_name: varchar("project_name", { length: 255 }).notNull(),
     display_name: varchar("display_name", { length: 255 }).notNull(),
     description: text("description"),
@@ -81,6 +95,7 @@ export const projects = whisperlySchema.table(
       table.user_id,
       table.project_name
     ),
+    entityIdx: index("whisperly_projects_entity_idx").on(table.entity_id),
   })
 );
 

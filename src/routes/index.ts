@@ -7,6 +7,8 @@ import analyticsRouter from "./analytics";
 import subscriptionRouter from "./subscription";
 import translateRouter from "./translate";
 import ratelimitsRouter from "./ratelimits";
+import entitiesRouter from "./entities";
+import invitationsRouter from "./invitations";
 
 const routes = new Hono();
 
@@ -26,6 +28,8 @@ adminRoutes.route("/users/:userId/settings", settingsRouter);
 adminRoutes.route("/users/:userId/analytics", analyticsRouter);
 adminRoutes.route("/users/:userId/subscription", subscriptionRouter);
 adminRoutes.route("/ratelimits", ratelimitsRouter);
+adminRoutes.route("/entities", entitiesRouter);
+adminRoutes.route("/invitations", invitationsRouter);
 routes.route("/", adminRoutes);
 
 export default routes;
@@ -39,4 +43,6 @@ export {
   subscriptionRouter,
   translateRouter,
   ratelimitsRouter,
+  entitiesRouter,
+  invitationsRouter,
 };

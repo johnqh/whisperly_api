@@ -3,6 +3,7 @@ import postgres from "postgres";
 import * as schema from "./schema";
 import { getRequiredEnv } from "../lib/env-helper";
 import { initRateLimitTable } from "@sudobility/ratelimit_service";
+import { runEntityMigration } from "@sudobility/entity_service";
 
 const connectionString = getRequiredEnv("DATABASE_URL");
 
@@ -117,6 +118,14 @@ export async function initDatabase() {
 
   // Rate limit counters table (from @sudobility/subscription_service)
   await initRateLimitTable(client, "whisperly", "whisperly");
+
+  // Entity tables and migration (from @sudobility/entity_service)
+  await runEntityMigration({
+    client,
+    schemaName: "whisperly",
+    indexPrefix: "whisperly",
+    migrateProjects: true,
+  });
 
   console.log("Database tables initialized");
 }
