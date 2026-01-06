@@ -1,88 +1,41 @@
-import typescriptEslint from "@typescript-eslint/eslint-plugin";
-import typescriptParser from "@typescript-eslint/parser";
-import importPlugin from "eslint-plugin-import";
+import js from '@eslint/js';
+import globals from 'globals';
+import reactHooks from 'eslint-plugin-react-hooks';
+import reactRefresh from 'eslint-plugin-react-refresh';
+import tseslint from 'typescript-eslint';
+import prettierConfig from 'eslint-config-prettier';
 
-export default [
+export default tseslint.config(
+  { ignores: ['dist', 'lib/**', 'indexer/**', 'wildduck/**'] },
   {
-    ignores: [
-      "node_modules/**",
-      "dist/**",
-      "coverage/**",
-      "eslint.config.js",
-    ],
-  },
-  {
-    files: ["**/*.{ts,tsx}"],
+    extends: [js.configs.recommended, ...tseslint.configs.recommended, prettierConfig],
+    files: ['**/*.{ts,tsx}'],
     languageOptions: {
-      parser: typescriptParser,
-      parserOptions: {
-        ecmaVersion: "latest",
-        sourceType: "module",
-        project: "./tsconfig.json",
-      },
+      ecmaVersion: 2020,
+      globals: globals.browser,
     },
     plugins: {
-      "@typescript-eslint": typescriptEslint,
-      import: importPlugin,
+      'react-hooks': reactHooks,
+      'react-refresh': reactRefresh,
     },
     rules: {
-      // TypeScript rules
-      "@typescript-eslint/no-unused-vars": [
-        "error",
-        { argsIgnorePattern: "^_" },
+      ...reactHooks.configs.recommended.rules,
+      'react-refresh/only-export-components': 'off',
+      // Relax some strict TypeScript rules for dependency compatibility
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+          destructuredArrayIgnorePattern: '^_',
+        },
       ],
-      "@typescript-eslint/no-explicit-any": "off",
-      "@typescript-eslint/explicit-function-return-type": "off",
-      "@typescript-eslint/explicit-module-boundary-types": "off",
-      "@typescript-eslint/no-non-null-assertion": "off",
-      "@typescript-eslint/no-var-requires": "error",
-
-      // General JavaScript/TypeScript rules
-      "no-console": "off",
-      "no-debugger": "error",
-      "no-duplicate-imports": "error",
-      "no-unused-expressions": "error",
-      "prefer-const": "error",
-      "no-var": "error",
-
-      // Import rules
-      "import/no-duplicates": "error",
-      "import/no-unresolved": "off",
-
-      // Specific overrides
-      "@typescript-eslint/ban-ts-comment": "off",
-      "@typescript-eslint/no-unsafe-assignment": "off",
-      "@typescript-eslint/no-unsafe-member-access": "off",
-      "@typescript-eslint/no-unsafe-call": "off",
-      "@typescript-eslint/no-unsafe-return": "off",
+      '@typescript-eslint/no-unsafe-function-type': 'error',
+      'no-case-declarations': 'warn',
+      'prefer-spread': 'warn',
+      'react-hooks/exhaustive-deps': 'error',
     },
-  },
-  {
-    files: ["**/*.test.{js,ts}", "**/__tests__/**", "tests/**"],
-    rules: {
-      "@typescript-eslint/no-explicit-any": "off",
-      "@typescript-eslint/no-non-null-assertion": "off",
-      "no-console": "off",
-    },
-  },
-  {
-    files: ["**/*.{js,mjs,cjs}"],
-    ignores: ["node_modules/**", "dist/**", "coverage/**"],
-    languageOptions: {
-      ecmaVersion: "latest",
-      sourceType: "module",
-    },
-    plugins: {
-      import: importPlugin,
-    },
-    rules: {
-      "no-console": "off",
-      "no-debugger": "error",
-      "no-duplicate-imports": "error",
-      "no-unused-expressions": "error",
-      "prefer-const": "error",
-      "no-var": "error",
-      "no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
-    },
-  },
-];
+  }
+);
