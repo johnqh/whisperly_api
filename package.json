@@ -1,6 +1,6 @@
 {
   "name": "@sudobility/whisperly_api",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "module": "src/index.ts",
   "type": "module",
   "private": true,
@@ -34,9 +34,9 @@
   },
   "dependencies": {
     "@hono/zod-validator": "^0.7.5",
-    "@sudobility/ratelimit_service": "^1.0.6",
-    "@sudobility/types": "^1.9.42",
-    "@sudobility/whisperly_types": "^1.0.6",
+    "@sudobility/ratelimit_service": "^1.0.7",
+    "@sudobility/types": "^1.9.43",
+    "@sudobility/whisperly_types": "^1.0.7",
     "drizzle-orm": "^0.45.0",
     "firebase-admin": "^13.6.0",
     "hono": "^4.10.7",
