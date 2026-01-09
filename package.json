@@ -1,6 +1,6 @@
 {
   "name": "@sudobility/whisperly_api",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "module": "src/index.ts",
   "type": "module",
   "private": true,
@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@hono/zod-validator": "^0.7.5",
-    "@sudobility/ratelimit_service": "^1.0.4",
+    "@sudobility/ratelimit_service": "^1.0.5",
     "@sudobility/types": "^1.9.41",
     "@sudobility/whisperly_types": "^1.0.3",
     "drizzle-orm": "^0.45.0",
