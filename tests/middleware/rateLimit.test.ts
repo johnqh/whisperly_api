@@ -1,5 +1,5 @@
-import { describe, test, expect } from "bun:test";
-import { rateLimitsConfig } from "../../src/middleware/rateLimit";
+import { describe, test, expect } from "vitest";
+import { rateLimitsConfig } from "../../src/config/rateLimits";
 
 describe("rateLimitsConfig", () => {
   describe("tier limits", () => {

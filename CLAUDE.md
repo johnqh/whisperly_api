@@ -3,6 +3,13 @@
 ## Project Overview
 `@sudobility/whisperly_api` is the backend API server for the Whisperly localization platform. It provides REST endpoints for project management, glossary management, translation services, analytics, and subscription handling.
 
+## Platform Support
+- **Web App**: No (backend only)
+- **React Native**: No (backend only)
+- **Backend (Node.js/Bun)**: Yes
+
+This is a backend-only server application that runs on Bun.
+
 ## Tech Stack
 - **Runtime**: Bun
 - **Framework**: Hono (lightweight web framework)
@@ -10,7 +17,7 @@
 - **Auth**: Firebase Admin SDK
 - **Validation**: Zod
 - **Rate Limiting**: @sudobility/ratelimit_service
-- **Testing**: Bun test runner
+- **Testing**: Vitest (node environment)
 
 ## Package Manager
 **IMPORTANT**: This project uses **Bun**, not npm or yarn.
@@ -58,7 +65,8 @@ tests/
 ```bash
 bun run dev          # Start dev server with watch mode
 bun run start        # Start production server
-bun run test         # Run all tests
+bun run test         # Run tests in watch mode
+bun run test:run     # Run tests once
 bun run typecheck    # Run TypeScript type checking
 bun run lint         # Run ESLint
 
@@ -131,11 +139,11 @@ return c.json(errorResponse('Error message'), 400);
 ```
 
 ## Testing
-Tests use Bun's built-in test runner. Test environment is configured in `tests/setup.ts`.
+Tests use Vitest with node environment. Configuration is in `vitest.config.ts`.
 
 ```bash
-bun test                    # Run all tests
-bun test tests/schemas      # Run specific directory
+bun run test                # Run tests in watch mode
+bun run test:run            # Run tests once
 ```
 
 ## Dependencies

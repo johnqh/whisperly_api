@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect } from "vitest";
 import { isAnonymousUser } from "../../src/services/firebase";
 import type { DecodedIdToken } from "firebase-admin/auth";
 

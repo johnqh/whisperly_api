@@ -3,26 +3,14 @@ import { eq } from "drizzle-orm";
 import {
   createRateLimitMiddleware,
   RateLimitRouteHandler,
-  type RateLimitsConfig,
 } from "@sudobility/ratelimit_service";
 import { db, rateLimitCounters, users, userSettings } from "../db";
 import { errorResponse } from "@sudobility/whisperly_types";
 import { getRequiredEnv } from "../lib/env-helper";
+import { rateLimitsConfig } from "../config/rateLimits";
 
-/**
- * Rate limit configuration for whisperly_api
- *
- * - none: Free tier users (no subscription)
- * - whisperly: Users with whisperly entitlement
- * - pro: Pro users with higher limits
- * - enterprise: Enterprise users with unlimited access
- */
-export const rateLimitsConfig: RateLimitsConfig = {
-  none: { hourly: 10, daily: 50, monthly: 200 },
-  whisperly: { hourly: 100, daily: 1000, monthly: 10000 },
-  pro: { hourly: 500, daily: 5000, monthly: 50000 },
-  enterprise: { hourly: undefined, daily: undefined, monthly: undefined },
-};
+// Re-export for backward compatibility
+export { rateLimitsConfig };
 
 /**
  * Route handler for rate limit endpoints.

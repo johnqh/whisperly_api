@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test";
+import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 
 // We need to test getEnv and getRequiredEnv
 // Since the module caches .env.local, we'll test the logic through process.env
