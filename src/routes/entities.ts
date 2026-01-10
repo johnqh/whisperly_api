@@ -6,7 +6,7 @@
 import { Hono } from "hono";
 import { db, entities, entityMembers, entityInvitations, users } from "../db";
 import { createEntityHelpers } from "@sudobility/entity_service";
-import type { EntityHelperConfig, InvitationHelperConfig } from "@sudobility/entity_service";
+import type { InvitationHelperConfig } from "@sudobility/entity_service";
 
 // Create entity helpers with whisperly schema
 const config: InvitationHelperConfig = {
