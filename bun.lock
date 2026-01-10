@@ -5,7 +5,8 @@
       "name": "whisperly_api",
       "dependencies": {
         "@hono/zod-validator": "^0.7.5",
-        "@sudobility/ratelimit_service": "^1.0.8",
+        "@sudobility/entity_service": "^1.0.8",
+        "@sudobility/ratelimit_service": "^1.0.12",
         "@sudobility/types": "^1.9.43",
         "@sudobility/whisperly_types": "^1.0.8",
         "drizzle-orm": "^0.45.0",
@@ -273,7 +274,9 @@
 
     "@standard-schema/spec": ["@standard-schema/spec@1.1.0", "", {}, "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="],
 
-    "@sudobility/ratelimit_service": ["@sudobility/ratelimit_service@1.0.8", "", { "peerDependencies": { "@sudobility/types": "^1.9.43", "drizzle-orm": "^0.45.0", "hono": "^4.0.0" } }, "sha512-pax3wu0b+3A5H4Ac5tMo1vBA/LF05O/HW82oq3oDXKmMtEzV8gUNH/54Bw3MtQXgIrzwFgqRi3Ala3doMgTiiQ=="],
+    "@sudobility/entity_service": ["@sudobility/entity_service@1.0.8", "", { "peerDependencies": { "@sudobility/types": "^1.9.43", "drizzle-orm": "^0.45.0", "hono": "^4.0.0" } }, "sha512-A/aqlPYkt0kuGqVVWhvkDH8yya5oDpp2m4OrNmuSG8ybjTe2W4Pr0nBzV5DPt9yH3d+J7v2TETt0LapTqjP1yA=="],
+
+    "@sudobility/ratelimit_service": ["@sudobility/ratelimit_service@1.0.12", "", { "peerDependencies": { "@sudobility/types": "^1.9.43", "drizzle-orm": "^0.45.0", "hono": "^4.0.0" } }, "sha512-TaNEJRMdOICHFkDP5i2uhnurQ5Whj1JtF3N/VQwz9wLVzvj67keCMEg9VMkRZueutfJ8OMLAHyesge/wCzfeZw=="],
 
     "@sudobility/types": ["@sudobility/types@1.9.43", "", {}, "sha512-P9KPNi9oniTxwRR7elAeC6FU9C9pShsfuyG6c83mdcE0uN1pxFGNxEDekahxMnQwXNT/oEAiGGd3hVLdKfmuyg=="],
 
