@@ -62,6 +62,10 @@ export const userSettings = whisperlySchema.table("user_settings", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" })
     .unique(),
+  firebase_uid: varchar("firebase_uid", { length: 128 }).references(
+    () => users.firebase_uid,
+    { onDelete: "cascade" }
+  ),
   organization_name: varchar("organization_name", { length: 255 }),
   organization_path: varchar("organization_path", { length: 255 })
     .notNull()
