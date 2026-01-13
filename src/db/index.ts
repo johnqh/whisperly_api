@@ -1,33 +1,58 @@
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import postgres, { type Sql } from "postgres";
 import * as schema from "./schema";
 import { getRequiredEnv } from "../lib/env-helper";
 import { initRateLimitTable } from "@sudobility/ratelimit_service";
 import { runEntityMigration } from "@sudobility/entity_service";
 
-const connectionString = getRequiredEnv("DATABASE_URL");
+// Lazy-initialized database connection
+let _client: Sql | null = null;
+let _db: PostgresJsDatabase<typeof schema> | null = null;
 
-const client = postgres(connectionString);
-export const db = drizzle(client, { schema });
+function getClient(): Sql {
+  if (!_client) {
+    const connectionString = getRequiredEnv("DATABASE_URL");
+    _client = postgres(connectionString);
+  }
+  return _client;
+}
+
+// Export db as a getter to ensure lazy initialization
+export const db: PostgresJsDatabase<typeof schema> = new Proxy(
+  {} as PostgresJsDatabase<typeof schema>,
+  {
+    get(_, prop) {
+      if (!_db) {
+        _db = drizzle(getClient(), { schema });
+      }
+      return (_db as any)[prop];
+    },
+  }
+);
 
 export async function initDatabase() {
+  const client = getClient();
+
   // Create schema if it doesn't exist
   await client`CREATE SCHEMA IF NOT EXISTS whisperly`;
 
   // Create enums (if they don't exist)
   await client`
     DO $$ BEGIN
-      CREATE TYPE whisperly.subscription_tier AS ENUM ('starter', 'pro', 'enterprise');
+      CREATE TYPE whisperly.http_method AS ENUM ('GET', 'POST');
     EXCEPTION
       WHEN duplicate_object THEN null;
     END $$;
   `;
 
-  // Create tables
+  // =============================================================================
+  // Step 1: Create users and user_settings tables
+  // firebase_uid is now the primary key
+  // =============================================================================
+
   await client`
     CREATE TABLE IF NOT EXISTS whisperly.users (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      firebase_uid VARCHAR(128) NOT NULL UNIQUE,
+      firebase_uid VARCHAR(128) PRIMARY KEY,
       email VARCHAR(255),
       display_name VARCHAR(255),
       created_at TIMESTAMP DEFAULT NOW(),
@@ -38,8 +63,7 @@ export async function initDatabase() {
   await client`
     CREATE TABLE IF NOT EXISTS whisperly.user_settings (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id UUID NOT NULL UNIQUE REFERENCES whisperly.users(id) ON DELETE CASCADE,
-      firebase_uid VARCHAR(128) REFERENCES whisperly.users(firebase_uid) ON DELETE CASCADE,
+      firebase_uid VARCHAR(128) NOT NULL UNIQUE REFERENCES whisperly.users(firebase_uid) ON DELETE CASCADE,
       organization_name VARCHAR(255),
       organization_path VARCHAR(255) NOT NULL UNIQUE,
       created_at TIMESTAMP DEFAULT NOW(),
@@ -47,62 +71,42 @@ export async function initDatabase() {
     )
   `;
 
-  // Add firebase_uid column if it doesn't exist (for existing databases)
-  await client`
-    DO $$
-    BEGIN
-      IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema = 'whisperly'
-        AND table_name = 'user_settings'
-        AND column_name = 'firebase_uid'
-      ) THEN
-        ALTER TABLE whisperly.user_settings
-        ADD COLUMN firebase_uid VARCHAR(128) REFERENCES whisperly.users(firebase_uid) ON DELETE CASCADE;
-      END IF;
-    END $$;
-  `;
+  // =============================================================================
+  // Step 2: Run entity migration (creates entities, entity_members tables)
+  // This must happen BEFORE tables that reference entities.id
+  // =============================================================================
 
-  // Populate firebase_uid from users table for existing records
-  await client`
-    UPDATE whisperly.user_settings s
-    SET firebase_uid = u.firebase_uid
-    FROM whisperly.users u
-    WHERE s.user_id = u.id
-    AND s.firebase_uid IS NULL
-  `;
+  await runEntityMigration({
+    client,
+    schemaName: "whisperly",
+    indexPrefix: "whisperly",
+    migrateProjects: false, // Tables are created fresh with entity_id
+    migrateUsers: false, // Personal entities created on-demand via EntityHelper
+  });
 
-  // Note: entity_id added here; entity_service migration skipped due to type mismatch
-  // (projects.user_id is UUID, entity_members.user_id is VARCHAR)
+  // =============================================================================
+  // Step 3: Create projects table (references entities.id)
+  // Projects belong to entities, not users
+  // =============================================================================
+
   await client`
     CREATE TABLE IF NOT EXISTS whisperly.projects (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id UUID NOT NULL REFERENCES whisperly.users(id) ON DELETE CASCADE,
-      entity_id UUID,
+      entity_id UUID NOT NULL REFERENCES whisperly.entities(id) ON DELETE CASCADE,
       project_name VARCHAR(255) NOT NULL,
       display_name VARCHAR(255) NOT NULL,
       description TEXT,
       instructions TEXT,
       is_active BOOLEAN DEFAULT true,
       created_at TIMESTAMP DEFAULT NOW(),
-      updated_at TIMESTAMP DEFAULT NOW(),
-      UNIQUE(user_id, project_name)
+      updated_at TIMESTAMP DEFAULT NOW()
     )
   `;
 
-  // Add entity_id column if it doesn't exist (for existing databases)
+  // Create unique index for project_name per entity
   await client`
-    DO $$
-    BEGIN
-      IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema = 'whisperly'
-        AND table_name = 'projects'
-        AND column_name = 'entity_id'
-      ) THEN
-        ALTER TABLE whisperly.projects ADD COLUMN entity_id UUID;
-      END IF;
-    END $$;
+    CREATE UNIQUE INDEX IF NOT EXISTS whisperly_unique_project_per_entity
+    ON whisperly.projects(entity_id, project_name)
   `;
 
   // Create index on projects.entity_id
@@ -110,6 +114,10 @@ export async function initDatabase() {
     CREATE INDEX IF NOT EXISTS whisperly_projects_entity_idx
     ON whisperly.projects (entity_id)
   `;
+
+  // =============================================================================
+  // Step 4: Create glossaries table
+  // =============================================================================
 
   await client`
     CREATE TABLE IF NOT EXISTS whisperly.glossaries (
@@ -124,28 +132,44 @@ export async function initDatabase() {
     )
   `;
 
+  // =============================================================================
+  // Step 5: Create endpoints table
+  // =============================================================================
+
   await client`
-    CREATE TABLE IF NOT EXISTS whisperly.subscriptions (
+    CREATE TABLE IF NOT EXISTS whisperly.endpoints (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id UUID NOT NULL UNIQUE REFERENCES whisperly.users(id) ON DELETE CASCADE,
-      tier whisperly.subscription_tier NOT NULL,
-      revenuecat_entitlement VARCHAR(255) NOT NULL,
-      monthly_request_limit INTEGER NOT NULL,
-      hourly_request_limit INTEGER NOT NULL,
-      requests_this_month INTEGER NOT NULL DEFAULT 0,
-      requests_this_hour INTEGER NOT NULL DEFAULT 0,
-      month_reset_at TIMESTAMP,
-      hour_reset_at TIMESTAMP,
+      project_id UUID NOT NULL REFERENCES whisperly.projects(id) ON DELETE CASCADE,
+      endpoint_name VARCHAR(255) NOT NULL,
+      display_name VARCHAR(255) NOT NULL,
+      http_method whisperly.http_method NOT NULL DEFAULT 'POST',
+      instructions TEXT,
+      default_source_language VARCHAR(10),
+      default_target_languages JSONB,
+      is_active BOOLEAN DEFAULT true,
+      ip_allowlist JSONB,
       created_at TIMESTAMP DEFAULT NOW(),
-      updated_at TIMESTAMP DEFAULT NOW()
+      updated_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(project_id, endpoint_name)
     )
   `;
 
+  // Create index on endpoints.project_id
+  await client`
+    CREATE INDEX IF NOT EXISTS whisperly_endpoints_project_idx
+    ON whisperly.endpoints (project_id)
+  `;
+
+  // =============================================================================
+  // Step 6: Create usage_records table
+  // =============================================================================
+
   await client`
     CREATE TABLE IF NOT EXISTS whisperly.usage_records (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id UUID NOT NULL REFERENCES whisperly.users(id) ON DELETE CASCADE,
+      uuid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      entity_id UUID NOT NULL REFERENCES whisperly.entities(id) ON DELETE CASCADE,
       project_id UUID NOT NULL REFERENCES whisperly.projects(id) ON DELETE CASCADE,
+      endpoint_id UUID REFERENCES whisperly.endpoints(id) ON DELETE CASCADE,
       timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
       request_count INTEGER NOT NULL DEFAULT 1,
       string_count INTEGER NOT NULL,
@@ -157,8 +181,8 @@ export async function initDatabase() {
 
   // Create indexes for analytics queries
   await client`
-    CREATE INDEX IF NOT EXISTS idx_usage_user_timestamp
-    ON whisperly.usage_records(user_id, timestamp DESC)
+    CREATE INDEX IF NOT EXISTS whisperly_idx_usage_entity_timestamp
+    ON whisperly.usage_records(entity_id, timestamp DESC)
   `;
 
   await client`
@@ -166,25 +190,26 @@ export async function initDatabase() {
     ON whisperly.usage_records(project_id, timestamp DESC)
   `;
 
-  // Rate limit counters table (from @sudobility/subscription_service)
-  await initRateLimitTable(client, "whisperly", "whisperly");
+  await client`
+    CREATE INDEX IF NOT EXISTS whisperly_idx_usage_endpoint_timestamp
+    ON whisperly.usage_records(endpoint_id, timestamp DESC)
+  `;
 
-  // Entity tables and migration (from @sudobility/entity_service)
-  // Note: migrateProjects disabled because projects.user_id is UUID but
-  // entity_members.user_id is VARCHAR (firebase_uid). entity_id column
-  // is added manually above.
-  await runEntityMigration({
-    client,
-    schemaName: "whisperly",
-    indexPrefix: "whisperly",
-    migrateProjects: false,
-  });
+  // =============================================================================
+  // Step 7: Rate limit counters table
+  // =============================================================================
+
+  await initRateLimitTable(client, "whisperly", "whisperly");
 
   console.log("Database tables initialized");
 }
 
 export async function closeDatabase() {
-  await client.end();
+  if (_client) {
+    await _client.end();
+    _client = null;
+    _db = null;
+  }
 }
 
 // Re-export schema for convenience

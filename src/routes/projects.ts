@@ -1,81 +1,97 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq, and } from "drizzle-orm";
-import { db, users, projects } from "../db";
+import { db, entities, entityMembers, projects, entityInvitations, users } from "../db";
 import {
   projectCreateSchema,
   projectUpdateSchema,
-  projectIdParamSchema,
+  entitySlugParamSchema,
+  entityProjectIdParamSchema,
 } from "../schemas";
 import { successResponse, errorResponse } from "@sudobility/whisperly_types";
+import { createEntityHelpers, type InvitationHelperConfig } from "@sudobility/entity_service";
 
 const projectsRouter = new Hono();
 
-/**
- * Helper to get or create user by Firebase UID
- */
-async function getOrCreateUser(firebaseUid: string, email?: string) {
-  const existing = await db
-    .select()
-    .from(users)
-    .where(eq(users.firebase_uid, firebaseUid));
+// Create entity helpers
+const config: InvitationHelperConfig = {
+  db: db as any,
+  entitiesTable: entities,
+  membersTable: entityMembers,
+  invitationsTable: entityInvitations,
+  usersTable: users,
+};
 
-  if (existing.length > 0) {
-    return existing[0]!;
+const helpers = createEntityHelpers(config);
+
+/**
+ * Helper to get entity by slug and verify user membership
+ */
+async function getEntityWithPermission(
+  entitySlug: string,
+  userId: string,
+  requireEdit = false
+): Promise<{ entity: typeof entities.$inferSelect; error?: string } | { entity?: undefined; error: string }> {
+  const entity = await helpers.entity.getEntityBySlug(entitySlug);
+  if (!entity) {
+    return { error: "Entity not found" };
   }
 
-  const created = await db
-    .insert(users)
-    .values({
-      firebase_uid: firebaseUid,
-      email: email ?? null,
-    })
-    .returning();
+  if (requireEdit) {
+    const canEdit = await helpers.permissions.canCreateProjects(entity.id, userId);
+    if (!canEdit) {
+      return { error: "Insufficient permissions" };
+    }
+  } else {
+    const canView = await helpers.permissions.canViewEntity(entity.id, userId);
+    if (!canView) {
+      return { error: "Access denied" };
+    }
+  }
 
-  return created[0]!;
+  return { entity };
 }
 
-// GET all projects for user
-projectsRouter.get("/", async c => {
-  const firebaseUser = c.get("firebaseUser");
-  const userId = c.req.param("userId");
+// GET all projects for entity
+projectsRouter.get(
+  "/",
+  zValidator("param", entitySlugParamSchema),
+  async c => {
+    const userId = c.get("firebaseUser").uid;
+    const { entitySlug } = c.req.valid("param");
 
-  if (firebaseUser.uid !== userId) {
-    return c.json(errorResponse("You can only access your own projects"), 403);
+    const result = await getEntityWithPermission(entitySlug, userId);
+    if (result.error) {
+      return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+    }
+
+    const rows = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.entity_id, result.entity.id));
+
+    return c.json(successResponse(rows));
   }
-
-  const user = await getOrCreateUser(firebaseUser.uid, firebaseUser.email);
-
-  const rows = await db
-    .select()
-    .from(projects)
-    .where(eq(projects.user_id, user.id));
-
-  return c.json(successResponse(rows));
-});
+);
 
 // GET single project
 projectsRouter.get(
   "/:projectId",
-  zValidator("param", projectIdParamSchema),
+  zValidator("param", entityProjectIdParamSchema),
   async c => {
-    const firebaseUser = c.get("firebaseUser");
-    const { userId, projectId } = c.req.valid("param");
+    const userId = c.get("firebaseUser").uid;
+    const { entitySlug, projectId } = c.req.valid("param");
 
-    if (firebaseUser.uid !== userId) {
-      return c.json(
-        errorResponse("You can only access your own projects"),
-        403
-      );
+    const result = await getEntityWithPermission(entitySlug, userId);
+    if (result.error) {
+      return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
     }
-
-    const user = await getOrCreateUser(firebaseUser.uid, firebaseUser.email);
 
     const rows = await db
       .select()
       .from(projects)
       .where(
-        and(eq(projects.user_id, user.id), eq(projects.id, projectId))
+        and(eq(projects.entity_id, result.entity.id), eq(projects.id, projectId))
       );
 
     if (rows.length === 0) {
@@ -87,71 +103,71 @@ projectsRouter.get(
 );
 
 // POST create project
-projectsRouter.post("/", zValidator("json", projectCreateSchema), async c => {
-  const firebaseUser = c.get("firebaseUser");
-  const userId = c.req.param("userId");
-  const body = c.req.valid("json");
+projectsRouter.post(
+  "/",
+  zValidator("param", entitySlugParamSchema),
+  zValidator("json", projectCreateSchema),
+  async c => {
+    const userId = c.get("firebaseUser").uid;
+    const { entitySlug } = c.req.valid("param");
+    const body = c.req.valid("json");
 
-  if (firebaseUser.uid !== userId) {
-    return c.json(errorResponse("You can only create your own projects"), 403);
+    const result = await getEntityWithPermission(entitySlug, userId, true);
+    if (result.error) {
+      return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+    }
+
+    // Check for duplicate project name within entity
+    const existing = await db
+      .select()
+      .from(projects)
+      .where(
+        and(
+          eq(projects.entity_id, result.entity.id),
+          eq(projects.project_name, body.project_name)
+        )
+      );
+
+    if (existing.length > 0) {
+      return c.json(errorResponse("Project name already exists"), 409);
+    }
+
+    const rows = await db
+      .insert(projects)
+      .values({
+        entity_id: result.entity.id,
+        project_name: body.project_name,
+        display_name: body.display_name,
+        description: body.description ?? null,
+        instructions: body.instructions ?? null,
+      })
+      .returning();
+
+    return c.json(successResponse(rows[0]), 201);
   }
-
-  const user = await getOrCreateUser(firebaseUser.uid, firebaseUser.email);
-
-  // Check for duplicate project name
-  const existing = await db
-    .select()
-    .from(projects)
-    .where(
-      and(
-        eq(projects.user_id, user.id),
-        eq(projects.project_name, body.project_name)
-      )
-    );
-
-  if (existing.length > 0) {
-    return c.json(errorResponse("Project name already exists"), 409);
-  }
-
-  const rows = await db
-    .insert(projects)
-    .values({
-      user_id: user.id,
-      project_name: body.project_name,
-      display_name: body.display_name,
-      description: body.description ?? null,
-      instructions: body.instructions ?? null,
-    })
-    .returning();
-
-  return c.json(successResponse(rows[0]), 201);
-});
+);
 
 // PUT update project
 projectsRouter.put(
   "/:projectId",
-  zValidator("param", projectIdParamSchema),
+  zValidator("param", entityProjectIdParamSchema),
   zValidator("json", projectUpdateSchema),
   async c => {
-    const firebaseUser = c.get("firebaseUser");
-    const { userId, projectId } = c.req.valid("param");
+    const userId = c.get("firebaseUser").uid;
+    const { entitySlug, projectId } = c.req.valid("param");
     const body = c.req.valid("json");
 
-    if (firebaseUser.uid !== userId) {
-      return c.json(
-        errorResponse("You can only update your own projects"),
-        403
-      );
+    const result = await getEntityWithPermission(entitySlug, userId, true);
+    if (result.error) {
+      return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
     }
-
-    const user = await getOrCreateUser(firebaseUser.uid, firebaseUser.email);
 
     // Check if project exists
     const existing = await db
       .select()
       .from(projects)
       .where(
-        and(eq(projects.user_id, user.id), eq(projects.id, projectId))
+        and(eq(projects.entity_id, result.entity.id), eq(projects.id, projectId))
       );
 
     if (existing.length === 0) {
@@ -167,7 +183,7 @@ projectsRouter.put(
         .from(projects)
         .where(
           and(
-            eq(projects.user_id, user.id),
+            eq(projects.entity_id, result.entity.id),
             eq(projects.project_name, body.project_name)
           )
         );
@@ -197,23 +213,19 @@ projectsRouter.put(
 // DELETE project
 projectsRouter.delete(
   "/:projectId",
-  zValidator("param", projectIdParamSchema),
+  zValidator("param", entityProjectIdParamSchema),
   async c => {
-    const firebaseUser = c.get("firebaseUser");
-    const { userId, projectId } = c.req.valid("param");
+    const userId = c.get("firebaseUser").uid;
+    const { entitySlug, projectId } = c.req.valid("param");
 
-    if (firebaseUser.uid !== userId) {
-      return c.json(
-        errorResponse("You can only delete your own projects"),
-        403
-      );
+    const result = await getEntityWithPermission(entitySlug, userId, true);
+    if (result.error) {
+      return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
     }
-
-    const user = await getOrCreateUser(firebaseUser.uid, firebaseUser.email);
 
     const rows = await db
       .delete(projects)
-      .where(and(eq(projects.user_id, user.id), eq(projects.id, projectId)))
+      .where(and(eq(projects.entity_id, result.entity.id), eq(projects.id, projectId)))
       .returning();
 
     if (rows.length === 0) {

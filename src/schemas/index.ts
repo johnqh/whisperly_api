@@ -8,6 +8,29 @@ export const userIdParamSchema = z.object({
   userId: z.string().min(1).max(128),
 });
 
+// Entity-centric param schemas (new structure)
+export const entitySlugParamSchema = z.object({
+  entitySlug: z.string().min(1).max(255),
+});
+
+export const entityProjectIdParamSchema = z.object({
+  entitySlug: z.string().min(1).max(255),
+  projectId: z.string().uuid(),
+});
+
+export const entityGlossaryIdParamSchema = z.object({
+  entitySlug: z.string().min(1).max(255),
+  projectId: z.string().uuid(),
+  glossaryId: z.string().uuid(),
+});
+
+export const entityEndpointIdParamSchema = z.object({
+  entitySlug: z.string().min(1).max(255),
+  projectId: z.string().uuid(),
+  endpointId: z.string().uuid(),
+});
+
+// Legacy param schemas (deprecated, kept for backward compatibility)
 export const projectIdParamSchema = z.object({
   userId: z.string().min(1).max(128),
   projectId: z.string().uuid(),
@@ -19,16 +42,22 @@ export const glossaryIdParamSchema = z.object({
   glossaryId: z.string().uuid(),
 });
 
+// Translation route params (entity-centric: /translate/:orgPath/:projectName/:endpointName)
 export const translateParamSchema = z.object({
   orgPath: z
     .string()
     .min(1)
     .max(255)
     .regex(
-      /^[a-zA-Z0-9_]+$/,
-      "Must contain only letters, numbers, and underscores"
+      /^[a-zA-Z0-9_-]+$/,
+      "Must contain only letters, numbers, underscores, and hyphens"
     ),
   projectName: z
+    .string()
+    .min(1)
+    .max(255)
+    .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/),
+  endpointName: z
     .string()
     .min(1)
     .max(255)
@@ -40,7 +69,7 @@ export const glossaryLookupParamSchema = z.object({
     .string()
     .min(1)
     .max(255)
-    .regex(/^[a-zA-Z0-9_]+$/),
+    .regex(/^[a-zA-Z0-9_-]+$/),
   projectName: z
     .string()
     .min(1)
@@ -140,6 +169,40 @@ export const analyticsQuerySchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
   project_id: z.string().uuid().optional(),
+});
+
+// =============================================================================
+// Endpoint Schemas
+// =============================================================================
+
+const endpointNameRegex = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/;
+
+export const endpointCreateSchema = z.object({
+  endpoint_name: z
+    .string()
+    .min(1)
+    .max(255)
+    .regex(
+      endpointNameRegex,
+      "Must be lowercase alphanumeric with optional hyphens"
+    ),
+  display_name: z.string().min(1).max(255),
+  http_method: z.enum(["GET", "POST"]).optional(),
+  instructions: z.string().max(10000).optional(),
+  default_source_language: z.string().min(2).max(10).optional(),
+  default_target_languages: z.array(z.string().min(2).max(10)).optional(),
+  ip_allowlist: z.array(z.string()).optional(),
+});
+
+export const endpointUpdateSchema = z.object({
+  endpoint_name: z.string().min(1).max(255).regex(endpointNameRegex).optional(),
+  display_name: z.string().min(1).max(255).optional(),
+  http_method: z.enum(["GET", "POST"]).optional(),
+  instructions: z.string().max(10000).optional(),
+  default_source_language: z.string().min(2).max(10).nullable().optional(),
+  default_target_languages: z.array(z.string().min(2).max(10)).nullable().optional(),
+  is_active: z.boolean().optional(),
+  ip_allowlist: z.array(z.string()).nullable().optional(),
 });
 
 // =============================================================================

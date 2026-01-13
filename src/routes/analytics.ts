@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
-import { db, users, projects, usageRecords } from "../db";
-import { analyticsQuerySchema } from "../schemas";
+import { db, entities, entityMembers, projects, usageRecords, entityInvitations, users } from "../db";
+import { analyticsQuerySchema, entitySlugParamSchema } from "../schemas";
 import {
   successResponse,
   errorResponse,
@@ -11,50 +11,97 @@ import {
   type UsageByProject,
   type UsageByDate,
 } from "@sudobility/whisperly_types";
+import { createEntityHelpers, type InvitationHelperConfig } from "@sudobility/entity_service";
 
 const analyticsRouter = new Hono();
 
-/**
- * Helper to get or create user by Firebase UID
- */
-async function getOrCreateUser(firebaseUid: string, email?: string) {
-  const existing = await db
-    .select()
-    .from(users)
-    .where(eq(users.firebase_uid, firebaseUid));
+// Create entity helpers
+const config: InvitationHelperConfig = {
+  db: db as any,
+  entitiesTable: entities,
+  membersTable: entityMembers,
+  invitationsTable: entityInvitations,
+  usersTable: users,
+};
 
-  if (existing.length > 0) {
-    return existing[0]!;
+const helpers = createEntityHelpers(config);
+
+/**
+ * Verify user has access to entity and return its ID.
+ */
+async function getEntityIdForAnalytics(
+  c: any,
+  firebaseUid: string
+): Promise<{ entityId: string | null; error: string | null }> {
+  const entitySlug = c.req.param("entitySlug");
+
+  if (!entitySlug) {
+    return { entityId: null, error: "entitySlug is required" };
   }
 
-  const created = await db
-    .insert(users)
-    .values({
-      firebase_uid: firebaseUid,
-      email: email ?? null,
-    })
-    .returning();
+  // Look up entity by slug
+  const entity = await helpers.entity.getEntityBySlug(entitySlug);
+  if (!entity) {
+    return { entityId: null, error: "Entity not found" };
+  }
 
-  return created[0]!;
+  // Verify user has access to this entity
+  const canView = await helpers.permissions.canViewEntity(entity.id, firebaseUid);
+  if (!canView) {
+    return { entityId: null, error: "Access denied to entity" };
+  }
+
+  return { entityId: entity.id, error: null };
 }
 
-// GET analytics
+// GET analytics for entity
 analyticsRouter.get(
   "/",
+  zValidator("param", entitySlugParamSchema),
   zValidator("query", analyticsQuerySchema),
   async c => {
     const firebaseUser = c.get("firebaseUser");
-    const userId = c.req.param("userId");
     const query = c.req.valid("query");
 
-    if (firebaseUser.uid !== userId) {
-      return c.json(
-        errorResponse("You can only access your own analytics"),
-        403
-      );
+    // Get entity ID from path parameter
+    const { entityId, error: entityError } = await getEntityIdForAnalytics(
+      c,
+      firebaseUser.uid
+    );
+
+    if (entityError || !entityId) {
+      const status = entityError === "entitySlug is required" ? 400 :
+                     entityError === "Access denied to entity" ? 403 : 404;
+      return c.json(errorResponse(entityError || "Entity not found"), status);
     }
 
-    const user = await getOrCreateUser(firebaseUser.uid, firebaseUser.email);
+    // Get all projects for this entity
+    const entityProjects = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.entity_id, entityId));
+
+    if (entityProjects.length === 0) {
+      // Return empty analytics if no projects
+      const emptyResponse: AnalyticsResponse = {
+        aggregate: {
+          total_requests: 0,
+          total_strings: 0,
+          total_characters: 0,
+          successful_requests: 0,
+          failed_requests: 0,
+          success_rate: 0,
+          period_start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+          period_end: new Date().toISOString(),
+        },
+        by_project: [],
+        by_date: [],
+      };
+      return c.json(successResponse(emptyResponse));
+    }
+
+    const projectIds = entityProjects.map(p => p.id);
+    const projectNameMap = new Map(entityProjects.map(p => [p.id, p.project_name]));
 
     // Build date range conditions
     const startDate = query.start_date
@@ -66,12 +113,16 @@ analyticsRouter.get(
 
     // Build where conditions
     const conditions = [
-      eq(usageRecords.user_id, user.id),
+      sql`${usageRecords.project_id} IN ${projectIds}`,
       gte(usageRecords.timestamp, startDate),
       lte(usageRecords.timestamp, endDate),
     ];
 
     if (query.project_id) {
+      // Make sure the requested project belongs to this entity
+      if (!projectIds.includes(query.project_id)) {
+        return c.json(errorResponse("Project not found in this entity"), 404);
+      }
       conditions.push(eq(usageRecords.project_id, query.project_id));
     }
 
@@ -109,20 +160,18 @@ analyticsRouter.get(
     const byProjectResult = await db
       .select({
         project_id: usageRecords.project_id,
-        project_name: projects.project_name,
         request_count: sql<number>`COALESCE(SUM(${usageRecords.request_count}), 0)::int`,
         string_count: sql<number>`COALESCE(SUM(${usageRecords.string_count}), 0)::int`,
         character_count: sql<number>`COALESCE(SUM(${usageRecords.character_count}), 0)::int`,
         successful_requests: sql<number>`COALESCE(SUM(CASE WHEN ${usageRecords.success} THEN ${usageRecords.request_count} ELSE 0 END), 0)::int`,
       })
       .from(usageRecords)
-      .innerJoin(projects, eq(usageRecords.project_id, projects.id))
       .where(and(...conditions))
-      .groupBy(usageRecords.project_id, projects.project_name);
+      .groupBy(usageRecords.project_id);
 
     const byProject: UsageByProject[] = byProjectResult.map(row => ({
       project_id: row.project_id,
-      project_name: row.project_name,
+      project_name: projectNameMap.get(row.project_id) ?? "unknown",
       request_count: row.request_count || 0,
       string_count: row.string_count || 0,
       character_count: row.character_count || 0,

@@ -1,17 +1,17 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq, and } from "drizzle-orm";
-import { db, entities, entityMembers, projects, glossaries, entityInvitations, users } from "../db";
+import { db, entities, entityMembers, projects, endpoints, entityInvitations, users } from "../db";
 import {
-  glossaryCreateSchema,
-  glossaryUpdateSchema,
+  endpointCreateSchema,
+  endpointUpdateSchema,
   entityProjectIdParamSchema,
-  entityGlossaryIdParamSchema,
+  entityEndpointIdParamSchema,
 } from "../schemas";
 import { successResponse, errorResponse } from "@sudobility/whisperly_types";
 import { createEntityHelpers, type InvitationHelperConfig } from "@sudobility/entity_service";
 
-const glossariesRouter = new Hono();
+const endpointsRouter = new Hono();
 
 // Create entity helpers
 const config: InvitationHelperConfig = {
@@ -64,8 +64,8 @@ async function verifyProjectOwnership(entityId: string, projectId: string) {
   return rows.length > 0 ? rows[0]! : null;
 }
 
-// GET all glossaries for project
-glossariesRouter.get(
+// GET all endpoints for project
+endpointsRouter.get(
   "/",
   zValidator("param", entityProjectIdParamSchema),
   async c => {
@@ -84,20 +84,20 @@ glossariesRouter.get(
 
     const rows = await db
       .select()
-      .from(glossaries)
-      .where(eq(glossaries.project_id, projectId));
+      .from(endpoints)
+      .where(eq(endpoints.project_id, projectId));
 
     return c.json(successResponse(rows));
   }
 );
 
-// GET single glossary
-glossariesRouter.get(
-  "/:glossaryId",
-  zValidator("param", entityGlossaryIdParamSchema),
+// GET single endpoint
+endpointsRouter.get(
+  "/:endpointId",
+  zValidator("param", entityEndpointIdParamSchema),
   async c => {
     const userId = c.get("firebaseUser").uid;
-    const { entitySlug, projectId, glossaryId } = c.req.valid("param");
+    const { entitySlug, projectId, endpointId } = c.req.valid("param");
 
     const result = await getEntityWithPermission(entitySlug, userId);
     if (result.error) {
@@ -111,27 +111,24 @@ glossariesRouter.get(
 
     const rows = await db
       .select()
-      .from(glossaries)
+      .from(endpoints)
       .where(
-        and(
-          eq(glossaries.project_id, projectId),
-          eq(glossaries.id, glossaryId)
-        )
+        and(eq(endpoints.project_id, projectId), eq(endpoints.id, endpointId))
       );
 
     if (rows.length === 0) {
-      return c.json(errorResponse("Glossary entry not found"), 404);
+      return c.json(errorResponse("Endpoint not found"), 404);
     }
 
     return c.json(successResponse(rows[0]));
   }
 );
 
-// POST create glossary
-glossariesRouter.post(
+// POST create endpoint
+endpointsRouter.post(
   "/",
   zValidator("param", entityProjectIdParamSchema),
-  zValidator("json", glossaryCreateSchema),
+  zValidator("json", endpointCreateSchema),
   async c => {
     const userId = c.get("firebaseUser").uid;
     const { entitySlug, projectId } = c.req.valid("param");
@@ -147,28 +144,35 @@ glossariesRouter.post(
       return c.json(errorResponse("Project not found"), 404);
     }
 
-    // Check for duplicate term
+    // Check for duplicate endpoint name within project
     const existing = await db
       .select()
-      .from(glossaries)
+      .from(endpoints)
       .where(
-        and(eq(glossaries.project_id, projectId), eq(glossaries.term, body.term))
+        and(
+          eq(endpoints.project_id, projectId),
+          eq(endpoints.endpoint_name, body.endpoint_name)
+        )
       );
 
     if (existing.length > 0) {
       return c.json(
-        errorResponse("Glossary term already exists in this project"),
+        errorResponse("Endpoint name already exists in this project"),
         409
       );
     }
 
     const rows = await db
-      .insert(glossaries)
+      .insert(endpoints)
       .values({
         project_id: projectId,
-        term: body.term,
-        translations: body.translations,
-        context: body.context ?? null,
+        endpoint_name: body.endpoint_name,
+        display_name: body.display_name,
+        http_method: body.http_method ?? "POST",
+        instructions: body.instructions ?? null,
+        default_source_language: body.default_source_language ?? null,
+        default_target_languages: body.default_target_languages ?? null,
+        ip_allowlist: body.ip_allowlist ?? null,
       })
       .returning();
 
@@ -176,14 +180,14 @@ glossariesRouter.post(
   }
 );
 
-// PUT update glossary
-glossariesRouter.put(
-  "/:glossaryId",
-  zValidator("param", entityGlossaryIdParamSchema),
-  zValidator("json", glossaryUpdateSchema),
+// PUT update endpoint
+endpointsRouter.put(
+  "/:endpointId",
+  zValidator("param", entityEndpointIdParamSchema),
+  zValidator("json", endpointUpdateSchema),
   async c => {
     const userId = c.get("firebaseUser").uid;
-    const { entitySlug, projectId, glossaryId } = c.req.valid("param");
+    const { entitySlug, projectId, endpointId } = c.req.valid("param");
     const body = c.req.valid("json");
 
     const result = await getEntityWithPermission(entitySlug, userId, true);
@@ -196,65 +200,89 @@ glossariesRouter.put(
       return c.json(errorResponse("Project not found"), 404);
     }
 
-    // Check if glossary exists
+    // Check if endpoint exists
     const existing = await db
       .select()
-      .from(glossaries)
+      .from(endpoints)
       .where(
-        and(
-          eq(glossaries.project_id, projectId),
-          eq(glossaries.id, glossaryId)
-        )
+        and(eq(endpoints.project_id, projectId), eq(endpoints.id, endpointId))
       );
 
     if (existing.length === 0) {
-      return c.json(errorResponse("Glossary entry not found"), 404);
+      return c.json(errorResponse("Endpoint not found"), 404);
     }
 
     const current = existing[0]!;
 
-    // Check for duplicate term if changing
-    if (body.term && body.term !== current.term) {
+    // Check for duplicate endpoint name if changing
+    if (body.endpoint_name && body.endpoint_name !== current.endpoint_name) {
       const duplicate = await db
         .select()
-        .from(glossaries)
+        .from(endpoints)
         .where(
           and(
-            eq(glossaries.project_id, projectId),
-            eq(glossaries.term, body.term)
+            eq(endpoints.project_id, projectId),
+            eq(endpoints.endpoint_name, body.endpoint_name)
           )
         );
 
       if (duplicate.length > 0) {
         return c.json(
-          errorResponse("Glossary term already exists in this project"),
+          errorResponse("Endpoint name already exists in this project"),
           409
         );
       }
     }
 
+    // Handle nullable fields - null means clear, undefined means keep current
+    const ipAllowlist =
+      body.ip_allowlist === null
+        ? null
+        : body.ip_allowlist !== undefined
+          ? body.ip_allowlist
+          : current.ip_allowlist;
+
+    const defaultTargetLanguages =
+      body.default_target_languages === null
+        ? null
+        : body.default_target_languages !== undefined
+          ? body.default_target_languages
+          : current.default_target_languages;
+
+    const defaultSourceLanguage =
+      body.default_source_language === null
+        ? null
+        : body.default_source_language !== undefined
+          ? body.default_source_language
+          : current.default_source_language;
+
     const rows = await db
-      .update(glossaries)
+      .update(endpoints)
       .set({
-        term: body.term ?? current.term,
-        translations: body.translations ?? current.translations,
-        context: body.context ?? current.context,
+        endpoint_name: body.endpoint_name ?? current.endpoint_name,
+        display_name: body.display_name ?? current.display_name,
+        http_method: body.http_method ?? current.http_method,
+        instructions: body.instructions ?? current.instructions,
+        default_source_language: defaultSourceLanguage,
+        default_target_languages: defaultTargetLanguages,
+        is_active: body.is_active ?? current.is_active,
+        ip_allowlist: ipAllowlist,
         updated_at: new Date(),
       })
-      .where(eq(glossaries.id, glossaryId))
+      .where(eq(endpoints.id, endpointId))
       .returning();
 
     return c.json(successResponse(rows[0]));
   }
 );
 
-// DELETE glossary
-glossariesRouter.delete(
-  "/:glossaryId",
-  zValidator("param", entityGlossaryIdParamSchema),
+// DELETE endpoint
+endpointsRouter.delete(
+  "/:endpointId",
+  zValidator("param", entityEndpointIdParamSchema),
   async c => {
     const userId = c.get("firebaseUser").uid;
-    const { entitySlug, projectId, glossaryId } = c.req.valid("param");
+    const { entitySlug, projectId, endpointId } = c.req.valid("param");
 
     const result = await getEntityWithPermission(entitySlug, userId, true);
     if (result.error) {
@@ -267,21 +295,18 @@ glossariesRouter.delete(
     }
 
     const rows = await db
-      .delete(glossaries)
+      .delete(endpoints)
       .where(
-        and(
-          eq(glossaries.project_id, projectId),
-          eq(glossaries.id, glossaryId)
-        )
+        and(eq(endpoints.project_id, projectId), eq(endpoints.id, endpointId))
       )
       .returning();
 
     if (rows.length === 0) {
-      return c.json(errorResponse("Glossary entry not found"), 404);
+      return c.json(errorResponse("Endpoint not found"), 404);
     }
 
     return c.json(successResponse(rows[0]));
   }
 );
 
-export default glossariesRouter;
+export default endpointsRouter;

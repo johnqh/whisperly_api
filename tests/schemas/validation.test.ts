@@ -66,34 +66,38 @@ describe("glossaryIdParamSchema", () => {
 });
 
 describe("translateParamSchema", () => {
-  test("accepts valid orgPath and projectName", () => {
+  test("accepts valid orgPath, projectName, and endpointName", () => {
     const result = translateParamSchema.safeParse({
       orgPath: "my_org_123",
       projectName: "my-project",
+      endpointName: "translate",
     });
     expect(result.success).toBe(true);
   });
 
-  test("accepts single character projectName", () => {
+  test("accepts single character projectName and endpointName", () => {
     const result = translateParamSchema.safeParse({
       orgPath: "org",
       projectName: "a",
+      endpointName: "b",
     });
     expect(result.success).toBe(true);
   });
 
-  test("rejects orgPath with special characters", () => {
+  test("accepts orgPath with hyphens (entity slugs can have hyphens)", () => {
     const result = translateParamSchema.safeParse({
       orgPath: "my-org",
       projectName: "project",
+      endpointName: "translate",
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
   test("rejects projectName starting with hyphen", () => {
     const result = translateParamSchema.safeParse({
       orgPath: "org",
       projectName: "-project",
+      endpointName: "translate",
     });
     expect(result.success).toBe(false);
   });
@@ -102,6 +106,7 @@ describe("translateParamSchema", () => {
     const result = translateParamSchema.safeParse({
       orgPath: "org",
       projectName: "project-",
+      endpointName: "translate",
     });
     expect(result.success).toBe(false);
   });
@@ -110,6 +115,33 @@ describe("translateParamSchema", () => {
     const result = translateParamSchema.safeParse({
       orgPath: "org",
       projectName: "MyProject",
+      endpointName: "translate",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  test("rejects endpointName starting with hyphen", () => {
+    const result = translateParamSchema.safeParse({
+      orgPath: "org",
+      projectName: "project",
+      endpointName: "-endpoint",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  test("rejects endpointName ending with hyphen", () => {
+    const result = translateParamSchema.safeParse({
+      orgPath: "org",
+      projectName: "project",
+      endpointName: "endpoint-",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  test("requires endpointName to be present", () => {
+    const result = translateParamSchema.safeParse({
+      orgPath: "org",
+      projectName: "project",
     });
     expect(result.success).toBe(false);
   });

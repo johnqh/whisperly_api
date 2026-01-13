@@ -36,11 +36,11 @@ async function getOrCreateUser(firebaseUid: string, email?: string) {
 }
 
 /**
- * Generate default organization path from user UUID
- * Uses first 8 characters of the UUID (without hyphens)
+ * Generate default organization path from firebase UID
+ * Uses first 8 characters of the UID (without special characters)
  */
-function generateDefaultOrgPath(userId: string): string {
-  return userId.replace(/-/g, "").slice(0, 8);
+function generateDefaultOrgPath(firebaseUid: string): string {
+  return firebaseUid.replace(/[^a-zA-Z0-9]/g, "").slice(0, 8);
 }
 
 // GET user settings
@@ -57,15 +57,15 @@ settingsRouter.get("/", async c => {
   const rows = await db
     .select()
     .from(userSettings)
-    .where(eq(userSettings.user_id, user.id));
+    .where(eq(userSettings.firebase_uid, user.firebase_uid));
 
   if (rows.length === 0) {
     // Return default settings with auto-generated org path
     const defaultSettings: UserSettings = {
       id: null,
-      user_id: user.id,
+      firebase_uid: user.firebase_uid,
       organization_name: null,
-      organization_path: generateDefaultOrgPath(user.id),
+      organization_path: generateDefaultOrgPath(user.firebase_uid),
       is_default: true,
       created_at: null,
       updated_at: null,
@@ -93,7 +93,7 @@ settingsRouter.put("/", zValidator("json", settingsUpdateSchema), async c => {
   const existing = await db
     .select()
     .from(userSettings)
-    .where(eq(userSettings.user_id, user.id));
+    .where(eq(userSettings.firebase_uid, user.firebase_uid));
 
   // If changing organization_path, check for duplicates
   if (body.organization_path) {
@@ -104,7 +104,7 @@ settingsRouter.put("/", zValidator("json", settingsUpdateSchema), async c => {
 
     if (
       duplicate.length > 0 &&
-      (existing.length === 0 || duplicate[0]!.user_id !== user.id)
+      (existing.length === 0 || duplicate[0]!.firebase_uid !== user.firebase_uid)
     ) {
       return c.json(errorResponse("Organization path already taken"), 409);
     }
@@ -112,7 +112,7 @@ settingsRouter.put("/", zValidator("json", settingsUpdateSchema), async c => {
 
   if (existing.length === 0) {
     // Create new settings
-    const orgPath = body.organization_path || generateDefaultOrgPath(user.id);
+    const orgPath = body.organization_path || generateDefaultOrgPath(user.firebase_uid);
 
     // Double-check the auto-generated path isn't taken
     if (!body.organization_path) {
@@ -134,7 +134,7 @@ settingsRouter.put("/", zValidator("json", settingsUpdateSchema), async c => {
     const rows = await db
       .insert(userSettings)
       .values({
-        user_id: user.id,
+        firebase_uid: user.firebase_uid,
         organization_name: body.organization_name ?? null,
         organization_path: orgPath,
       })
@@ -153,7 +153,7 @@ settingsRouter.put("/", zValidator("json", settingsUpdateSchema), async c => {
       organization_path: body.organization_path ?? current.organization_path,
       updated_at: new Date(),
     })
-    .where(eq(userSettings.user_id, user.id))
+    .where(eq(userSettings.firebase_uid, user.firebase_uid))
     .returning();
 
   const updated: UserSettings = { ...rows[0]!, is_default: false };
