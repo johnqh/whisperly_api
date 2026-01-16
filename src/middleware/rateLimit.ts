@@ -3,65 +3,122 @@ import { eq } from "drizzle-orm";
 import {
   createRateLimitMiddleware,
   RateLimitRouteHandler,
+  EntitlementHelper,
+  RateLimitChecker,
 } from "@sudobility/ratelimit_service";
+import { SubscriptionHelper } from "@sudobility/subscription_service";
 import { db, rateLimitCounters, entities } from "../db";
 import { errorResponse } from "@sudobility/whisperly_types";
-import { getEnv } from "../lib/env-helper";
+import { getEnv, getRequiredEnv } from "../lib/env-helper";
 import { rateLimitsConfig } from "../config/rateLimits";
 
 // Re-export for backward compatibility
 export { rateLimitsConfig };
 
-/**
- * Factory function to get RateLimitRouteHandler with optional sandbox mode
- */
-export function getRateLimitRouteHandler(testMode: boolean = false): RateLimitRouteHandler {
-  const apiKey = testMode
-    ? getEnv("REVENUECAT_API_KEY_SANDBOX")
-    : getEnv("REVENUECAT_API_KEY");
+export const entitlementDisplayNames: Record<string, string> = {
+  none: "Free",
+  whisperly: "Whisperly",
+  pro: "Pro",
+  enterprise: "Enterprise",
+};
 
-  return new RateLimitRouteHandler({
-    revenueCatApiKey: apiKey ?? "",
-    rateLimitsConfig,
-    db: db as any,
-    rateLimitsTable: rateLimitCounters as any,
-    entitlementDisplayNames: {
-      none: "Free",
-      whisperly: "Whisperly",
-      pro: "Pro",
-      enterprise: "Enterprise",
-    },
-  });
+// Lazy-initialized instances to avoid requiring env vars at module load time
+let _subscriptionHelper: SubscriptionHelper | null = null;
+let _entitlementHelper: EntitlementHelper | null = null;
+let _rateLimitChecker: RateLimitChecker | null = null;
+let _rateLimitRouteHandler: RateLimitRouteHandler | null = null;
+let _rateLimitMiddleware: ReturnType<typeof createRateLimitMiddleware> | null =
+  null;
+
+/**
+ * Get subscription helper (singleton, lazily initialized).
+ * Uses single API key - testMode is passed to getSubscriptionInfo to filter sandbox purchases.
+ */
+export function getSubscriptionHelper(): SubscriptionHelper | null {
+  const apiKey = getEnv("REVENUECAT_API_KEY");
+  if (!apiKey) return null;
+  if (!_subscriptionHelper) {
+    _subscriptionHelper = new SubscriptionHelper({ revenueCatApiKey: apiKey });
+  }
+  return _subscriptionHelper;
+}
+
+export function getEntitlementHelper(): EntitlementHelper {
+  if (!_entitlementHelper) {
+    _entitlementHelper = new EntitlementHelper(rateLimitsConfig);
+  }
+  return _entitlementHelper;
+}
+
+export function getRateLimitChecker(): RateLimitChecker {
+  if (!_rateLimitChecker) {
+    _rateLimitChecker = new RateLimitChecker({
+      db: db as any,
+      table: rateLimitCounters as any,
+    });
+  }
+  return _rateLimitChecker;
 }
 
 /**
- * Legacy route handler (production mode).
- * @deprecated Use getRateLimitRouteHandler(testMode) instead.
+ * Get the route handler for rate limit endpoints.
+ * Lazily initialized to avoid requiring REVENUECAT_API_KEY at module load time.
+ * Uses single API key - testMode is passed to individual methods to filter sandbox purchases.
  */
-export const rateLimitRouteHandler = getRateLimitRouteHandler(false);
+export function getRateLimitRouteHandler(): RateLimitRouteHandler {
+  if (!_rateLimitRouteHandler) {
+    _rateLimitRouteHandler = new RateLimitRouteHandler({
+      revenueCatApiKey: getRequiredEnv("REVENUECAT_API_KEY"),
+      rateLimitsConfig,
+      db: db as any,
+      rateLimitsTable: rateLimitCounters as any,
+      entitlementDisplayNames,
+    });
+  }
+  return _rateLimitRouteHandler;
+}
 
 /**
- * Internal rate limit middleware created by subscription_service.
- * This expects the Firebase UID to be available via getUserId.
+ * Get the rate limit middleware for whisperly_api.
+ * Lazily initialized to avoid requiring REVENUECAT_API_KEY at module load time.
+ * Uses single API key - testMode is extracted from URL query parameter to filter sandbox purchases.
  */
-const internalRateLimitMiddleware = createRateLimitMiddleware({
-  revenueCatApiKey: getEnv("REVENUECAT_API_KEY") ?? "",
-  rateLimitsConfig,
-  // Cast to any to avoid type conflicts between different drizzle-orm/hono instances
-  // when using bun link for local development
-  db: db as any,
-  rateLimitsTable: rateLimitCounters as any,
-  getUserId: (c) => {
-    // Get the entity ID that was set by the entity lookup
-    const entityId = (c as any).get("rateLimitEntityId");
-    if (!entityId) {
-      throw new Error("Entity ID not found in context for rate limiting");
-    }
-    // Return entity ID as the "user" for rate limiting
-    // (rate limits are now per-entity, not per-user)
-    return entityId;
-  },
-});
+function getRateLimitMiddleware(): ReturnType<typeof createRateLimitMiddleware> {
+  if (!_rateLimitMiddleware) {
+    _rateLimitMiddleware = createRateLimitMiddleware({
+      revenueCatApiKey: getRequiredEnv("REVENUECAT_API_KEY"),
+      rateLimitsConfig,
+      // Cast to any to avoid type conflicts between different drizzle-orm/hono instances
+      // when using bun link for local development
+      db: db as any,
+      rateLimitsTable: rateLimitCounters as any,
+      getUserId: (c: any) => {
+        // Get the entity ID that was set by the entity lookup
+        const entityId = c.get("rateLimitEntityId");
+        if (!entityId) {
+          throw new Error("Entity ID not found in context for rate limiting");
+        }
+        // Return entity ID as the "user" for rate limiting
+        // (rate limits are now per-entity, not per-user)
+        return entityId;
+      },
+      getTestMode: (c: any) => {
+        const url = new URL(c.req.url);
+        return url.searchParams.get("testMode") === "true";
+      },
+    });
+  }
+  return _rateLimitMiddleware;
+}
+
+/**
+ * Extract testMode from URL query parameter.
+ * Exported for use by route handlers that need to pass testMode to RateLimitRouteHandler methods.
+ */
+export function getTestMode(c: Context): boolean {
+  const url = new URL(c.req.url);
+  return url.searchParams.get("testMode") === "true";
+}
 
 /**
  * Rate limiting middleware for translation endpoints.
@@ -98,7 +155,8 @@ export async function rateLimitMiddleware(c: Context, next: Next) {
 
   // Apply rate limiting using subscription_service (per-entity)
   // Cast to any to avoid type conflicts between different hono instances
-  await internalRateLimitMiddleware(c as any, next as any);
+  const middleware = getRateLimitMiddleware();
+  await middleware(c as any, next as any);
 }
 
 // Extend Hono context types

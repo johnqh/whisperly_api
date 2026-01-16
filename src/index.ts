@@ -12,16 +12,15 @@ const app = new Hono();
 app.use("*", logger());
 app.use("*", cors());
 
-// Health check
-app.get("/", c => {
-  return c.json(
-    successResponse({
-      name: "Whisperly API",
-      version: "1.0.0",
-      status: "healthy",
-    })
-  );
-});
+// Health check endpoints
+const healthResponse = {
+  name: "Whisperly API",
+  version: "1.0.0",
+  status: "healthy",
+};
+
+app.get("/", c => c.json(successResponse(healthResponse)));
+app.get("/health", c => c.json(successResponse(healthResponse)));
 
 // API routes
 app.route("/api/v1", routes);

@@ -8,7 +8,7 @@ import {
   type RateLimitsConfigResponse,
   type RateLimitHistoryResponse,
 } from "@sudobility/types";
-import { getRateLimitRouteHandler, rateLimitsConfig } from "../middleware/rateLimit";
+import { getRateLimitRouteHandler, rateLimitsConfig, getTestMode } from "../middleware/rateLimit";
 import { getEnv } from "../lib/env-helper";
 import { db, entities, entityMembers, entityInvitations, users } from "../db";
 import { createEntityHelpers, type InvitationHelperConfig } from "@sudobility/entity_service";
@@ -27,21 +27,10 @@ const config: InvitationHelperConfig = {
 const helpers = createEntityHelpers(config);
 
 /**
- * Extract testMode from URL query parameter
- */
-function getTestMode(c: any): boolean {
-  const url = new URL(c.req.url);
-  const testMode = url.searchParams.get("testMode");
-  return testMode === "true";
-}
-
-/**
  * Check if RevenueCat is configured
  */
-function isRevenueCatConfigured(testMode: boolean = false): boolean {
-  const key = testMode
-    ? getEnv("REVENUECAT_API_KEY_SANDBOX")
-    : getEnv("REVENUECAT_API_KEY");
+function isRevenueCatConfigured(): boolean {
+  const key = getEnv("REVENUECAT_API_KEY");
   return !!key && key.length > 0;
 }
 
@@ -89,7 +78,7 @@ ratelimitsRouter.get("/", async c => {
     const testMode = getTestMode(c);
 
     // If RevenueCat is not configured, return static config without usage data
-    if (!isRevenueCatConfigured(testMode)) {
+    if (!isRevenueCatConfigured()) {
       const noneLimits = rateLimitsConfig.none;
       return c.json(successResponse({
         tiers: rateLimitsConfig,
@@ -118,8 +107,9 @@ ratelimitsRouter.get("/", async c => {
     }
 
     // Use entity ID for rate limits (subscriptions are per-entity)
-    const data = await getRateLimitRouteHandler(testMode).getRateLimitsConfigData(
-      entityId
+    const data = await getRateLimitRouteHandler().getRateLimitsConfigData(
+      entityId,
+      testMode
     );
 
     return c.json(successResponse(data) as RateLimitsConfigResponse);
@@ -153,7 +143,7 @@ ratelimitsRouter.get("/history/:periodType", async c => {
     }
 
     // If RevenueCat is not configured, return empty history
-    if (!isRevenueCatConfigured(testMode)) {
+    if (!isRevenueCatConfigured()) {
       return c.json(successResponse({
         periodType: periodTypeParam as RateLimitPeriodType,
         entries: [],
@@ -177,9 +167,11 @@ ratelimitsRouter.get("/history/:periodType", async c => {
     }
 
     // Use entity ID for rate limits (subscriptions are per-entity)
-    const data = await getRateLimitRouteHandler(testMode).getRateLimitHistoryData(
+    const data = await getRateLimitRouteHandler().getRateLimitHistoryData(
       entityId,
-      periodType
+      periodType,
+      undefined, // use default limit
+      testMode
     );
 
     return c.json(successResponse(data) as RateLimitHistoryResponse);
