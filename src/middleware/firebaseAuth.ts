@@ -1,6 +1,10 @@
+/**
+ * @fileoverview Firebase authentication middleware
+ */
+
 import type { Context, Next } from "hono";
 import type { DecodedIdToken } from "firebase-admin/auth";
-import { verifyIdToken, isAnonymousUser } from "../services/firebase";
+import { verifyIdToken, isAnonymousUser, isSiteAdmin } from "../services/firebase";
 import { errorResponse } from "@sudobility/whisperly_types";
 import { eq } from "drizzle-orm";
 import { db, users } from "../db";
@@ -8,8 +12,9 @@ import { db, users } from "../db";
 declare module "hono" {
   interface ContextVariableMap {
     firebaseUser: DecodedIdToken;
-    userId: string; // This is now the firebase_uid directly
+    userId: string;
     userEmail: string | null;
+    siteAdmin: boolean;
   }
 }
 
@@ -34,6 +39,15 @@ async function ensureUserExists(
   }
 }
 
+/**
+ * Firebase authentication middleware.
+ *
+ * Verifies Firebase ID token and sets context variables:
+ * - firebaseUser: The decoded Firebase token
+ * - userId: The Firebase UID
+ * - userEmail: The user's email (or null)
+ * - siteAdmin: Whether the user is a site admin
+ */
 export async function firebaseAuthMiddleware(c: Context, next: Next) {
   const authHeader = c.req.header("Authorization");
 
@@ -60,16 +74,18 @@ export async function firebaseAuthMiddleware(c: Context, next: Next) {
       );
     }
 
+    // Set context variables
+    c.set("firebaseUser", decodedToken);
+    c.set("userId", decodedToken.uid);
+    c.set("userEmail", decodedToken.email ?? null);
+    c.set("siteAdmin", isSiteAdmin(decodedToken.email));
+
     // Ensure user exists in database (for profile data)
     // Run in background - don't block the request
     ensureUserExists(decodedToken.uid, decodedToken.email).catch((err) =>
       console.error("Failed to ensure user exists:", err)
     );
 
-    // userId is now the firebase_uid directly
-    c.set("firebaseUser", decodedToken);
-    c.set("userId", decodedToken.uid);
-    c.set("userEmail", decodedToken.email ?? null);
     await next();
   } catch {
     return c.json(errorResponse("Invalid or expired Firebase token"), 401);

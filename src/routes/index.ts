@@ -9,6 +9,7 @@ import translateRouter from "./translate";
 import ratelimitsRouter from "./ratelimits";
 import entitiesRouter from "./entities";
 import invitationsRouter from "./invitations";
+import usersRouter from "./users";
 
 const routes = new Hono();
 
@@ -39,6 +40,7 @@ adminRoutes.route("/invitations", invitationsRouter);
 
 // User-specific routes (not entity-based)
 adminRoutes.route("/users/:userId/settings", settingsRouter);
+adminRoutes.route("/users", usersRouter);
 
 routes.route("/", adminRoutes);
 
@@ -55,4 +57,5 @@ export {
   ratelimitsRouter,
   entitiesRouter,
   invitationsRouter,
+  usersRouter,
 };
