@@ -5,7 +5,7 @@
       "name": "whisperly_api",
       "dependencies": {
         "@hono/zod-validator": "^0.7.5",
-        "@sudobility/auth_lib": "^0.0.14",
+        "@sudobility/auth_lib": "^0.0.16",
         "@sudobility/auth_service": "^1.1.1",
         "@sudobility/entity_service": "^1.0.14",
         "@sudobility/ratelimit_service": "^1.0.17",
@@ -347,7 +347,7 @@
 
     "@standard-schema/spec": ["@standard-schema/spec@1.1.0", "", {}, "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="],
 
-    "@sudobility/auth_lib": ["@sudobility/auth_lib@0.0.14", "", { "peerDependencies": { "@sudobility/di": "^1.5.21", "@sudobility/types": "^1.9.48", "@tanstack/react-query": "^5.0.0", "firebase": "^12.7.0", "react": "^19.2.3" } }, "sha512-rqiz+ri9NYIUkM1D4T+7yuckZBpxNpEPzGCrb7isTMYiqTdsPugp16ywlJ/tuIqdTa3jfSa7xKk+vcIa2iBU1A=="],
+    "@sudobility/auth_lib": ["@sudobility/auth_lib@0.0.16", "", { "peerDependencies": { "@sudobility/di": "^1.5.22", "@sudobility/types": "^1.9.48", "@tanstack/react-query": "^5.0.0", "firebase": "^12.7.0", "react": "^19.2.3" } }, "sha512-kqC+TnY/OPj8q0pjLPUS1ey1mKe8jhxIQyZwWsrkMjTIliYgQnowWfAMwRTvPIzJL4ErEIpKL7In9RvCrUD6pQ=="],
 
     "@sudobility/auth_service": ["@sudobility/auth_service@1.1.1", "", { "peerDependencies": { "@sudobility/types": "^1.9.48", "firebase-admin": "^13.0.0" } }, "sha512-WLRoz/ml1YZvvEXPZEJpj9Xb543wvxOQViG2ZtJ/pptZT2G+ZBxBSRU2Vqtji4EM8JwqLuoL4urH7jm270FTwQ=="],
 
