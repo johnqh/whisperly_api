@@ -1,8 +1,7 @@
 import { Hono } from "hono";
 import { firebaseAuthMiddleware } from "../middleware/firebaseAuth";
 import projectsRouter from "./projects";
-import endpointsRouter from "./endpoints";
-import glossariesRouter from "./glossaries";
+import dictionaryRouter from "./dictionary";
 import settingsRouter from "./settings";
 import analyticsRouter from "./analytics";
 import translateRouter from "./translate";
@@ -21,15 +20,11 @@ routes.route("/translate", translateRouter);
 const adminRoutes = new Hono();
 adminRoutes.use("*", firebaseAuthMiddleware);
 
-// Entity-centric routes (new structure - like shapeshyft)
+// Entity-centric routes
 adminRoutes.route("/entities/:entitySlug/projects", projectsRouter);
 adminRoutes.route(
-  "/entities/:entitySlug/projects/:projectId/endpoints",
-  endpointsRouter
-);
-adminRoutes.route(
-  "/entities/:entitySlug/projects/:projectId/glossaries",
-  glossariesRouter
+  "/entities/:entitySlug/projects/:projectId/dictionary",
+  dictionaryRouter
 );
 adminRoutes.route("/entities/:entitySlug/analytics", analyticsRouter);
 adminRoutes.route("/ratelimits/:rateLimitUserId", ratelimitsRouter);
@@ -49,8 +44,7 @@ export default routes;
 // Also export individual routers for testing
 export {
   projectsRouter,
-  endpointsRouter,
-  glossariesRouter,
+  dictionaryRouter,
   settingsRouter,
   analyticsRouter,
   translateRouter,

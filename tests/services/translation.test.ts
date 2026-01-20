@@ -1,10 +1,10 @@
-import { describe, expect, test, beforeEach, afterEach } from "vitest";
+import { describe, expect, test, afterEach } from "vitest";
 import {
-  buildGlossaryCallbackUrl,
-  extractGlossaryTerms,
+  buildDictionaryCallbackUrl,
+  extractDictionaryTerms,
 } from "../../src/services/translation";
 
-describe("buildGlossaryCallbackUrl", () => {
+describe("buildDictionaryCallbackUrl", () => {
   const originalEnv = process.env.API_BASE_URL;
 
   afterEach(() => {
@@ -17,31 +17,31 @@ describe("buildGlossaryCallbackUrl", () => {
 
   test("builds correct URL with default base URL", () => {
     delete process.env.API_BASE_URL;
-    const url = buildGlossaryCallbackUrl("my_org", "my-project");
-    expect(url).toBe("http://localhost:3000/api/v1/glossary/my_org/my-project");
+    const url = buildDictionaryCallbackUrl("my_org", "my-project");
+    expect(url).toBe("http://localhost:3000/api/v1/dictionary/my_org/my-project");
   });
 
   test("builds correct URL with custom base URL", () => {
     process.env.API_BASE_URL = "https://api.example.com";
-    const url = buildGlossaryCallbackUrl("org123", "project-name");
+    const url = buildDictionaryCallbackUrl("org123", "project-name");
     expect(url).toBe(
-      "https://api.example.com/api/v1/glossary/org123/project-name"
+      "https://api.example.com/api/v1/dictionary/org123/project-name"
     );
   });
 
   test("handles single character org path and project name", () => {
     delete process.env.API_BASE_URL;
-    const url = buildGlossaryCallbackUrl("a", "b");
-    expect(url).toBe("http://localhost:3000/api/v1/glossary/a/b");
+    const url = buildDictionaryCallbackUrl("a", "b");
+    expect(url).toBe("http://localhost:3000/api/v1/dictionary/a/b");
   });
 });
 
-describe("extractGlossaryTerms", () => {
+describe("extractDictionaryTerms", () => {
   test("extracts matching terms from strings", () => {
     const strings = ["Hello World", "Welcome to the app"];
-    const glossaryTerms = ["Hello", "app", "missing"];
+    const dictionaryTerms = ["Hello", "app", "missing"];
 
-    const result = extractGlossaryTerms(strings, glossaryTerms);
+    const result = extractDictionaryTerms(strings, dictionaryTerms);
 
     expect(result).toContain("Hello");
     expect(result).toContain("app");
@@ -51,9 +51,9 @@ describe("extractGlossaryTerms", () => {
 
   test("performs case-insensitive matching", () => {
     const strings = ["HELLO world", "Welcome to the APP"];
-    const glossaryTerms = ["hello", "APP"];
+    const dictionaryTerms = ["hello", "APP"];
 
-    const result = extractGlossaryTerms(strings, glossaryTerms);
+    const result = extractDictionaryTerms(strings, dictionaryTerms);
 
     expect(result).toContain("hello");
     expect(result).toContain("APP");
@@ -61,55 +61,55 @@ describe("extractGlossaryTerms", () => {
 
   test("returns empty array when no terms match", () => {
     const strings = ["Hello World"];
-    const glossaryTerms = ["goodbye", "universe"];
+    const dictionaryTerms = ["goodbye", "universe"];
 
-    const result = extractGlossaryTerms(strings, glossaryTerms);
+    const result = extractDictionaryTerms(strings, dictionaryTerms);
 
     expect(result).toEqual([]);
   });
 
   test("returns empty array for empty strings array", () => {
     const strings: string[] = [];
-    const glossaryTerms = ["hello"];
+    const dictionaryTerms = ["hello"];
 
-    const result = extractGlossaryTerms(strings, glossaryTerms);
+    const result = extractDictionaryTerms(strings, dictionaryTerms);
 
     expect(result).toEqual([]);
   });
 
-  test("returns empty array for empty glossary terms", () => {
+  test("returns empty array for empty dictionary terms", () => {
     const strings = ["Hello World"];
-    const glossaryTerms: string[] = [];
+    const dictionaryTerms: string[] = [];
 
-    const result = extractGlossaryTerms(strings, glossaryTerms);
+    const result = extractDictionaryTerms(strings, dictionaryTerms);
 
     expect(result).toEqual([]);
   });
 
   test("deduplicates terms found in multiple strings", () => {
     const strings = ["Hello there", "Hello again", "Hello once more"];
-    const glossaryTerms = ["Hello"];
+    const dictionaryTerms = ["Hello"];
 
-    const result = extractGlossaryTerms(strings, glossaryTerms);
+    const result = extractDictionaryTerms(strings, dictionaryTerms);
 
     expect(result).toEqual(["Hello"]);
   });
 
   test("matches terms that span word boundaries", () => {
     const strings = ["This is a substring test"];
-    const glossaryTerms = ["sub", "string"];
+    const dictionaryTerms = ["sub", "string"];
 
-    const result = extractGlossaryTerms(strings, glossaryTerms);
+    const result = extractDictionaryTerms(strings, dictionaryTerms);
 
     expect(result).toContain("sub");
     expect(result).toContain("string");
   });
 
-  test("handles multi-word glossary terms", () => {
+  test("handles multi-word dictionary terms", () => {
     const strings = ["The quick brown fox jumps"];
-    const glossaryTerms = ["quick brown", "slow red"];
+    const dictionaryTerms = ["quick brown", "slow red"];
 
-    const result = extractGlossaryTerms(strings, glossaryTerms);
+    const result = extractDictionaryTerms(strings, dictionaryTerms);
 
     expect(result).toContain("quick brown");
     expect(result).not.toContain("slow red");

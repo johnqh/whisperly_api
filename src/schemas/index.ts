@@ -18,31 +18,20 @@ export const entityProjectIdParamSchema = z.object({
   projectId: z.string().uuid(),
 });
 
-export const entityGlossaryIdParamSchema = z.object({
+export const entityDictionaryIdParamSchema = z.object({
   entitySlug: z.string().min(1).max(255),
   projectId: z.string().uuid(),
-  glossaryId: z.string().uuid(),
+  dictionaryId: z.string().uuid(),
 });
 
-export const entityEndpointIdParamSchema = z.object({
+export const dictionarySearchParamSchema = z.object({
   entitySlug: z.string().min(1).max(255),
   projectId: z.string().uuid(),
-  endpointId: z.string().uuid(),
+  language_code: z.string().min(2).max(10),
+  text: z.string().min(1),
 });
 
-// Legacy param schemas (deprecated, kept for backward compatibility)
-export const projectIdParamSchema = z.object({
-  userId: z.string().min(1).max(128),
-  projectId: z.string().uuid(),
-});
-
-export const glossaryIdParamSchema = z.object({
-  userId: z.string().min(1).max(128),
-  projectId: z.string().uuid(),
-  glossaryId: z.string().uuid(),
-});
-
-// Translation route params (entity-centric: /translate/:orgPath/:projectName/:endpointName)
+// Translation route params (entity-centric: /translate/:orgPath/:projectName)
 export const translateParamSchema = z.object({
   orgPath: z
     .string()
@@ -57,14 +46,9 @@ export const translateParamSchema = z.object({
     .min(1)
     .max(255)
     .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/),
-  endpointName: z
-    .string()
-    .min(1)
-    .max(255)
-    .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/),
 });
 
-export const glossaryLookupParamSchema = z.object({
+export const dictionaryLookupParamSchema = z.object({
   orgPath: z
     .string()
     .min(1)
@@ -95,6 +79,9 @@ export const projectCreateSchema = z.object({
   display_name: z.string().min(1).max(255),
   description: z.string().max(1000).optional(),
   instructions: z.string().max(10000).optional(),
+  default_source_language: z.string().min(2).max(10).optional(),
+  default_target_languages: z.array(z.string().min(2).max(10)).optional(),
+  ip_allowlist: z.array(z.string()).optional(),
 });
 
 export const projectUpdateSchema = z.object({
@@ -102,24 +89,21 @@ export const projectUpdateSchema = z.object({
   display_name: z.string().min(1).max(255).optional(),
   description: z.string().max(1000).optional(),
   instructions: z.string().max(10000).optional(),
+  default_source_language: z.string().min(2).max(10).nullable().optional(),
+  default_target_languages: z.array(z.string().min(2).max(10)).nullable().optional(),
+  ip_allowlist: z.array(z.string()).nullable().optional(),
   is_active: z.boolean().optional(),
 });
 
 // =============================================================================
-// Glossary Schemas
+// Dictionary Schemas
 // =============================================================================
 
-export const glossaryCreateSchema = z.object({
-  term: z.string().min(1).max(500),
-  translations: z.record(z.string(), z.string()),
-  context: z.string().max(1000).optional(),
-});
+// Payload: { "en": "hello", "es": "hola" }
+export const dictionaryCreateSchema = z.record(z.string().min(2).max(10), z.string().min(1));
 
-export const glossaryUpdateSchema = z.object({
-  term: z.string().min(1).max(500).optional(),
-  translations: z.record(z.string(), z.string()).optional(),
-  context: z.string().max(1000).optional(),
-});
+// Payload: { "en": "hi", "de": "hallo" } - partial update
+export const dictionaryUpdateSchema = z.record(z.string().min(2).max(10), z.string().min(1));
 
 // =============================================================================
 // Settings Schemas
@@ -150,8 +134,8 @@ export const translationRequestSchema = z.object({
   source_language: z.string().min(2).max(10).optional(),
 });
 
-export const glossaryLookupQuerySchema = z.object({
-  glossary: z.string().min(1).max(500),
+export const dictionaryLookupQuerySchema = z.object({
+  term: z.string().min(1).max(500),
   languages: z.string().min(2), // comma-separated list
 });
 
@@ -169,40 +153,6 @@ export const analyticsQuerySchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
   project_id: z.string().uuid().optional(),
-});
-
-// =============================================================================
-// Endpoint Schemas
-// =============================================================================
-
-const endpointNameRegex = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/;
-
-export const endpointCreateSchema = z.object({
-  endpoint_name: z
-    .string()
-    .min(1)
-    .max(255)
-    .regex(
-      endpointNameRegex,
-      "Must be lowercase alphanumeric with optional hyphens"
-    ),
-  display_name: z.string().min(1).max(255),
-  http_method: z.enum(["GET", "POST"]).optional(),
-  instructions: z.string().max(10000).optional(),
-  default_source_language: z.string().min(2).max(10).optional(),
-  default_target_languages: z.array(z.string().min(2).max(10)).optional(),
-  ip_allowlist: z.array(z.string()).optional(),
-});
-
-export const endpointUpdateSchema = z.object({
-  endpoint_name: z.string().min(1).max(255).regex(endpointNameRegex).optional(),
-  display_name: z.string().min(1).max(255).optional(),
-  http_method: z.enum(["GET", "POST"]).optional(),
-  instructions: z.string().max(10000).optional(),
-  default_source_language: z.string().min(2).max(10).nullable().optional(),
-  default_target_languages: z.array(z.string().min(2).max(10)).nullable().optional(),
-  is_active: z.boolean().optional(),
-  ip_allowlist: z.array(z.string()).nullable().optional(),
 });
 
 // =============================================================================

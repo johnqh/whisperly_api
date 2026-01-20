@@ -97,10 +97,24 @@ export async function initDatabase() {
       display_name VARCHAR(255) NOT NULL,
       description TEXT,
       instructions TEXT,
+      default_source_language VARCHAR(10),
+      default_target_languages JSONB,
+      ip_allowlist JSONB,
       is_active BOOLEAN DEFAULT true,
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW()
     )
+  `;
+
+  // Add new columns to existing projects table (if they don't exist)
+  await client`
+    DO $$ BEGIN
+      ALTER TABLE whisperly.projects ADD COLUMN IF NOT EXISTS default_source_language VARCHAR(10);
+      ALTER TABLE whisperly.projects ADD COLUMN IF NOT EXISTS default_target_languages JSONB;
+      ALTER TABLE whisperly.projects ADD COLUMN IF NOT EXISTS ip_allowlist JSONB;
+    EXCEPTION
+      WHEN duplicate_column THEN null;
+    END $$;
   `;
 
   // Create unique index for project_name per entity
@@ -116,60 +130,75 @@ export async function initDatabase() {
   `;
 
   // =============================================================================
-  // Step 4: Create glossaries table
+  // Step 4: Create dictionary tables
   // =============================================================================
 
+  // Drop old glossaries table if it exists
+  await client`DROP TABLE IF EXISTS whisperly.glossaries CASCADE`;
+
   await client`
-    CREATE TABLE IF NOT EXISTS whisperly.glossaries (
+    CREATE TABLE IF NOT EXISTS whisperly.dictionary (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      entity_id UUID NOT NULL REFERENCES whisperly.entities(id) ON DELETE CASCADE,
       project_id UUID NOT NULL REFERENCES whisperly.projects(id) ON DELETE CASCADE,
-      term VARCHAR(500) NOT NULL,
-      translations JSONB NOT NULL,
-      context TEXT,
       created_at TIMESTAMP DEFAULT NOW(),
-      updated_at TIMESTAMP DEFAULT NOW(),
-      UNIQUE(project_id, term)
+      updated_at TIMESTAMP DEFAULT NOW()
     )
   `;
 
-  // =============================================================================
-  // Step 5: Create endpoints table
-  // =============================================================================
+  // Create indexes for dictionary
+  await client`
+    CREATE INDEX IF NOT EXISTS whisperly_dictionary_project_idx
+    ON whisperly.dictionary (project_id)
+  `;
 
   await client`
-    CREATE TABLE IF NOT EXISTS whisperly.endpoints (
+    CREATE INDEX IF NOT EXISTS whisperly_dictionary_entity_idx
+    ON whisperly.dictionary (entity_id)
+  `;
+
+  await client`
+    CREATE TABLE IF NOT EXISTS whisperly.dictionary_entry (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      project_id UUID NOT NULL REFERENCES whisperly.projects(id) ON DELETE CASCADE,
-      endpoint_name VARCHAR(255) NOT NULL,
-      display_name VARCHAR(255) NOT NULL,
-      http_method whisperly.http_method NOT NULL DEFAULT 'POST',
-      instructions TEXT,
-      default_source_language VARCHAR(10),
-      default_target_languages JSONB,
-      is_active BOOLEAN DEFAULT true,
-      ip_allowlist JSONB,
+      dictionary_id UUID NOT NULL REFERENCES whisperly.dictionary(id) ON DELETE CASCADE,
+      language_code VARCHAR(10) NOT NULL,
+      text TEXT NOT NULL,
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW(),
-      UNIQUE(project_id, endpoint_name)
+      UNIQUE(dictionary_id, language_code)
     )
   `;
 
-  // Create index on endpoints.project_id
+  // Create index for dictionary_entry lookups
   await client`
-    CREATE INDEX IF NOT EXISTS whisperly_endpoints_project_idx
-    ON whisperly.endpoints (project_id)
+    CREATE INDEX IF NOT EXISTS whisperly_dict_entry_dict_idx
+    ON whisperly.dictionary_entry (dictionary_id)
   `;
+
+  // =============================================================================
+  // Step 5: Drop endpoints table (no longer needed)
+  // =============================================================================
+
+  await client`DROP TABLE IF EXISTS whisperly.endpoints CASCADE`;
 
   // =============================================================================
   // Step 6: Create usage_records table
   // =============================================================================
+
+  // Remove endpoint_id column if it exists (migrating from old schema)
+  await client`
+    DO $$ BEGIN
+      ALTER TABLE whisperly.usage_records DROP COLUMN IF EXISTS endpoint_id;
+    EXCEPTION
+      WHEN undefined_column THEN null;
+    END $$;
+  `;
 
   await client`
     CREATE TABLE IF NOT EXISTS whisperly.usage_records (
       uuid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       entity_id UUID NOT NULL REFERENCES whisperly.entities(id) ON DELETE CASCADE,
       project_id UUID NOT NULL REFERENCES whisperly.projects(id) ON DELETE CASCADE,
-      endpoint_id UUID REFERENCES whisperly.endpoints(id) ON DELETE CASCADE,
       timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
       request_count INTEGER NOT NULL DEFAULT 1,
       string_count INTEGER NOT NULL,
@@ -188,11 +217,6 @@ export async function initDatabase() {
   await client`
     CREATE INDEX IF NOT EXISTS idx_usage_project_timestamp
     ON whisperly.usage_records(project_id, timestamp DESC)
-  `;
-
-  await client`
-    CREATE INDEX IF NOT EXISTS whisperly_idx_usage_endpoint_timestamp
-    ON whisperly.usage_records(endpoint_id, timestamp DESC)
   `;
 
   // =============================================================================

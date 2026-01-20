@@ -1,13 +1,13 @@
 import { describe, expect, test } from "vitest";
 import {
   userIdParamSchema,
-  projectIdParamSchema,
-  glossaryIdParamSchema,
+  entityProjectIdParamSchema,
+  entityDictionaryIdParamSchema,
   translateParamSchema,
   projectCreateSchema,
   projectUpdateSchema,
-  glossaryCreateSchema,
-  glossaryUpdateSchema,
+  dictionaryCreateSchema,
+  dictionaryUpdateSchema,
   settingsUpdateSchema,
   translationRequestSchema,
   analyticsQuerySchema,
@@ -36,50 +36,48 @@ describe("userIdParamSchema", () => {
   });
 });
 
-describe("projectIdParamSchema", () => {
-  test("accepts valid projectId UUID", () => {
-    const result = projectIdParamSchema.safeParse({
-      userId: "user123",
+describe("entityProjectIdParamSchema", () => {
+  test("accepts valid entitySlug and projectId UUID", () => {
+    const result = entityProjectIdParamSchema.safeParse({
+      entitySlug: "my-org",
       projectId: "550e8400-e29b-41d4-a716-446655440000",
     });
     expect(result.success).toBe(true);
   });
 
   test("rejects invalid UUID format", () => {
-    const result = projectIdParamSchema.safeParse({
-      userId: "user123",
+    const result = entityProjectIdParamSchema.safeParse({
+      entitySlug: "my-org",
       projectId: "not-a-uuid",
     });
     expect(result.success).toBe(false);
   });
 });
 
-describe("glossaryIdParamSchema", () => {
-  test("accepts valid glossaryId UUID", () => {
-    const result = glossaryIdParamSchema.safeParse({
-      userId: "user123",
+describe("entityDictionaryIdParamSchema", () => {
+  test("accepts valid entitySlug, projectId, and dictionaryId UUIDs", () => {
+    const result = entityDictionaryIdParamSchema.safeParse({
+      entitySlug: "my-org",
       projectId: "550e8400-e29b-41d4-a716-446655440000",
-      glossaryId: "660e8400-e29b-41d4-a716-446655440000",
+      dictionaryId: "660e8400-e29b-41d4-a716-446655440000",
     });
     expect(result.success).toBe(true);
   });
 });
 
 describe("translateParamSchema", () => {
-  test("accepts valid orgPath, projectName, and endpointName", () => {
+  test("accepts valid orgPath and projectName", () => {
     const result = translateParamSchema.safeParse({
       orgPath: "my_org_123",
       projectName: "my-project",
-      endpointName: "translate",
     });
     expect(result.success).toBe(true);
   });
 
-  test("accepts single character projectName and endpointName", () => {
+  test("accepts single character projectName", () => {
     const result = translateParamSchema.safeParse({
       orgPath: "org",
       projectName: "a",
-      endpointName: "b",
     });
     expect(result.success).toBe(true);
   });
@@ -88,7 +86,6 @@ describe("translateParamSchema", () => {
     const result = translateParamSchema.safeParse({
       orgPath: "my-org",
       projectName: "project",
-      endpointName: "translate",
     });
     expect(result.success).toBe(true);
   });
@@ -97,7 +94,6 @@ describe("translateParamSchema", () => {
     const result = translateParamSchema.safeParse({
       orgPath: "org",
       projectName: "-project",
-      endpointName: "translate",
     });
     expect(result.success).toBe(false);
   });
@@ -106,7 +102,6 @@ describe("translateParamSchema", () => {
     const result = translateParamSchema.safeParse({
       orgPath: "org",
       projectName: "project-",
-      endpointName: "translate",
     });
     expect(result.success).toBe(false);
   });
@@ -115,35 +110,20 @@ describe("translateParamSchema", () => {
     const result = translateParamSchema.safeParse({
       orgPath: "org",
       projectName: "MyProject",
-      endpointName: "translate",
     });
     expect(result.success).toBe(false);
   });
 
-  test("rejects endpointName starting with hyphen", () => {
-    const result = translateParamSchema.safeParse({
+  test("requires both orgPath and projectName to be present", () => {
+    const result1 = translateParamSchema.safeParse({
       orgPath: "org",
-      projectName: "project",
-      endpointName: "-endpoint",
     });
-    expect(result.success).toBe(false);
-  });
+    expect(result1.success).toBe(false);
 
-  test("rejects endpointName ending with hyphen", () => {
-    const result = translateParamSchema.safeParse({
-      orgPath: "org",
-      projectName: "project",
-      endpointName: "endpoint-",
-    });
-    expect(result.success).toBe(false);
-  });
-
-  test("requires endpointName to be present", () => {
-    const result = translateParamSchema.safeParse({
-      orgPath: "org",
+    const result2 = translateParamSchema.safeParse({
       projectName: "project",
     });
-    expect(result.success).toBe(false);
+    expect(result2.success).toBe(false);
   });
 });
 
@@ -222,61 +202,57 @@ describe("projectUpdateSchema", () => {
   });
 });
 
-describe("glossaryCreateSchema", () => {
-  test("accepts valid glossary data", () => {
-    const result = glossaryCreateSchema.safeParse({
-      term: "Hello",
-      translations: { es: "Hola", fr: "Bonjour" },
-      context: "Greeting",
+describe("dictionaryCreateSchema", () => {
+  test("accepts valid dictionary translations", () => {
+    const result = dictionaryCreateSchema.safeParse({
+      en: "Hello",
+      es: "Hola",
+      fr: "Bonjour",
     });
     expect(result.success).toBe(true);
   });
 
-  test("accepts glossary without context", () => {
-    const result = glossaryCreateSchema.safeParse({
-      term: "World",
-      translations: { es: "Mundo" },
+  test("accepts single language entry", () => {
+    const result = dictionaryCreateSchema.safeParse({
+      es: "Mundo",
     });
     expect(result.success).toBe(true);
   });
 
-  test("rejects empty term", () => {
-    const result = glossaryCreateSchema.safeParse({
-      term: "",
-      translations: { es: "Hola" },
+  test("rejects empty translation text", () => {
+    const result = dictionaryCreateSchema.safeParse({
+      en: "",
     });
     expect(result.success).toBe(false);
   });
 
-  test("rejects term over 500 characters", () => {
-    const result = glossaryCreateSchema.safeParse({
-      term: "a".repeat(501),
-      translations: { es: "Hola" },
+  test("rejects language code under 2 characters", () => {
+    const result = dictionaryCreateSchema.safeParse({
+      e: "Hola",
     });
     expect(result.success).toBe(false);
   });
 
-  test("rejects context over 1000 characters", () => {
-    const result = glossaryCreateSchema.safeParse({
-      term: "Hello",
-      translations: { es: "Hola" },
-      context: "a".repeat(1001),
+  test("rejects language code over 10 characters", () => {
+    const result = dictionaryCreateSchema.safeParse({
+      verylonglang: "Hola",
     });
     expect(result.success).toBe(false);
   });
 });
 
-describe("glossaryUpdateSchema", () => {
+describe("dictionaryUpdateSchema", () => {
   test("accepts partial update", () => {
-    const result = glossaryUpdateSchema.safeParse({
-      term: "Updated",
+    const result = dictionaryUpdateSchema.safeParse({
+      de: "Hallo",
     });
     expect(result.success).toBe(true);
   });
 
-  test("accepts translations-only update", () => {
-    const result = glossaryUpdateSchema.safeParse({
-      translations: { de: "Hallo" },
+  test("accepts multiple language updates", () => {
+    const result = dictionaryUpdateSchema.safeParse({
+      de: "Hallo",
+      it: "Ciao",
     });
     expect(result.success).toBe(true);
   });

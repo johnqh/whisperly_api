@@ -1,6 +1,5 @@
 import {
   pgSchema,
-  pgEnum,
   uuid,
   varchar,
   text,
@@ -20,12 +19,6 @@ import {
 
 // Create the whisperly schema
 export const whisperlySchema = pgSchema("whisperly");
-
-// =============================================================================
-// Enums
-// =============================================================================
-
-export const httpMethodEnum = pgEnum("http_method", ["GET", "POST"]);
 
 // =============================================================================
 // Users Table
@@ -83,6 +76,9 @@ export const projects = whisperlySchema.table(
     display_name: varchar("display_name", { length: 255 }).notNull(),
     description: text("description"),
     instructions: text("instructions"),
+    default_source_language: varchar("default_source_language", { length: 10 }),
+    default_target_languages: jsonb("default_target_languages").$type<string[]>(),
+    ip_allowlist: jsonb("ip_allowlist").$type<string[]>(),
     is_active: boolean("is_active").default(true),
     created_at: timestamp("created_at").defaultNow(),
     updated_at: timestamp("updated_at").defaultNow(),
@@ -98,60 +94,53 @@ export const projects = whisperlySchema.table(
 );
 
 // =============================================================================
-// Glossaries Table
+// Dictionary Table
+// Groups related translation entries together
 // =============================================================================
 
-export const glossaries = whisperlySchema.table(
-  "glossaries",
+export const dictionary = whisperlySchema.table(
+  "dictionary",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    entity_id: uuid("entity_id")
+      .notNull()
+      .references(() => entities.id, { onDelete: "cascade" }),
     project_id: uuid("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
-    term: varchar("term", { length: 500 }).notNull(),
-    translations: jsonb("translations").notNull().$type<Record<string, string>>(),
-    context: text("context"),
     created_at: timestamp("created_at").defaultNow(),
     updated_at: timestamp("updated_at").defaultNow(),
   },
   table => ({
-    uniqueTermPerProject: uniqueIndex("unique_term_per_project").on(
-      table.project_id,
-      table.term
-    ),
+    projectIdx: index("whisperly_dictionary_project_idx").on(table.project_id),
+    entityIdx: index("whisperly_dictionary_entity_idx").on(table.entity_id),
   })
 );
 
 // =============================================================================
-// Endpoints Table
+// Dictionary Entry Table
+// Individual language translations within a dictionary
 // =============================================================================
 
-export const endpoints = whisperlySchema.table(
-  "endpoints",
+export const dictionaryEntry = whisperlySchema.table(
+  "dictionary_entry",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    project_id: uuid("project_id")
+    dictionary_id: uuid("dictionary_id")
       .notNull()
-      .references(() => projects.id, { onDelete: "cascade" }),
-    endpoint_name: varchar("endpoint_name", { length: 255 }).notNull(),
-    display_name: varchar("display_name", { length: 255 }).notNull(),
-    http_method: httpMethodEnum("http_method").notNull().default("POST"),
-    // Translation-specific configuration
-    instructions: text("instructions"),
-    default_source_language: varchar("default_source_language", { length: 10 }),
-    default_target_languages: jsonb("default_target_languages").$type<string[]>(),
-    is_active: boolean("is_active").default(true),
-    // IP Allowlist - JSON array of IPv4 addresses, null = allow all
-    ip_allowlist: jsonb("ip_allowlist").$type<string[]>(),
+      .references(() => dictionary.id, { onDelete: "cascade" }),
+    language_code: varchar("language_code", { length: 10 }).notNull(),
+    text: text("text").notNull(),
     created_at: timestamp("created_at").defaultNow(),
     updated_at: timestamp("updated_at").defaultNow(),
   },
   table => ({
-    uniqueEndpointPerProject: uniqueIndex("whisperly_unique_endpoint_per_project").on(
-      table.project_id,
-      table.endpoint_name
+    // One entry per language per dictionary
+    uniqueLangPerDict: uniqueIndex("whisperly_unique_lang_per_dict").on(
+      table.dictionary_id,
+      table.language_code
     ),
-    projectIdx: index("whisperly_endpoints_project_idx").on(table.project_id),
+    dictIdx: index("whisperly_dict_entry_dict_idx").on(table.dictionary_id),
   })
 );
 
@@ -169,7 +158,6 @@ export const usageRecords = whisperlySchema.table(
     project_id: uuid("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
-    endpoint_id: uuid("endpoint_id").references(() => endpoints.id, { onDelete: "cascade" }),
     timestamp: timestamp("timestamp").notNull().defaultNow(),
     request_count: integer("request_count").notNull().default(1),
     string_count: integer("string_count").notNull(),
@@ -184,10 +172,6 @@ export const usageRecords = whisperlySchema.table(
     ),
     projectTimestampIdx: index("idx_usage_project_timestamp").on(
       table.project_id,
-      table.timestamp
-    ),
-    endpointTimestampIdx: index("whisperly_idx_usage_endpoint_timestamp").on(
-      table.endpoint_id,
       table.timestamp
     ),
   })

@@ -46,27 +46,27 @@ export async function translateStrings(
 }
 
 /**
- * Build the glossary callback URL for the translation service
+ * Build the dictionary callback URL for the translation service
  */
-export function buildGlossaryCallbackUrl(
+export function buildDictionaryCallbackUrl(
   orgPath: string,
   projectName: string
 ): string {
   const baseUrl = getEnv("API_BASE_URL", "http://localhost:3000");
-  return `${baseUrl}/api/v1/glossary/${orgPath}/${projectName}`;
+  return `${baseUrl}/api/v1/dictionary/${orgPath}/${projectName}`;
 }
 
 /**
- * Extract glossary terms from strings based on project glossaries
+ * Extract dictionary terms from strings based on project dictionary entries
  */
-export function extractGlossaryTerms(
+export function extractDictionaryTerms(
   strings: string[],
-  glossaryTerms: string[]
+  dictionaryTerms: string[]
 ): string[] {
   const foundTerms = new Set<string>();
   const combinedText = strings.join(" ").toLowerCase();
 
-  for (const term of glossaryTerms) {
+  for (const term of dictionaryTerms) {
     if (combinedText.includes(term.toLowerCase())) {
       foundTerms.add(term);
     }

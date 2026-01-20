@@ -15,6 +15,10 @@ export default defineConfig({
         "./tests/__mocks__/ratelimit_service.ts",
         import.meta.url
       ).pathname,
+      "@sudobility/auth_service": new URL(
+        "./tests/__mocks__/auth_service.ts",
+        import.meta.url
+      ).pathname,
     },
   },
 });

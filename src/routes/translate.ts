@@ -1,23 +1,23 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { eq, and } from "drizzle-orm";
-import { db, entities, projects, endpoints, glossaries, usageRecords } from "../db";
+import { eq, and, sql } from "drizzle-orm";
+import { db, entities, projects, dictionary, dictionaryEntry, usageRecords } from "../db";
 import {
   translateParamSchema,
   translationRequestSchema,
-  glossaryLookupParamSchema,
-  glossaryLookupQuerySchema,
+  dictionaryLookupParamSchema,
+  dictionaryLookupQuerySchema,
 } from "../schemas";
 import {
   successResponse,
   errorResponse,
   type TranslationResponse,
-  type GlossaryLookupResponse,
+  type DictionaryLookupResponse,
 } from "@sudobility/whisperly_types";
 import {
   translateStrings,
-  buildGlossaryCallbackUrl,
-  extractGlossaryTerms,
+  buildDictionaryCallbackUrl,
+  extractDictionaryTerms,
 } from "../services/translation";
 import { rateLimitMiddleware } from "../middleware/rateLimit";
 
@@ -77,62 +77,9 @@ async function findEntityBySlug(
 
 /**
  * Helper to find project by entity slug and project name
- * Returns project, entity, and optional endpoint
+ * Returns project and entity
  */
-async function findProjectAndEndpoint(
-  orgPath: string,
-  projectName: string,
-  endpointName: string
-) {
-  // First find entity by slug
-  const entity = await findEntityBySlug(orgPath);
-  if (!entity) {
-    return { error: "Organization not found", project: null, entity: null, endpoint: null };
-  }
-
-  // Find project by name and entity
-  const projectRows = await db
-    .select()
-    .from(projects)
-    .where(
-      and(
-        eq(projects.entity_id, entity.id),
-        eq(projects.project_name, projectName),
-        eq(projects.is_active, true)
-      )
-    );
-
-  if (projectRows.length === 0) {
-    return { error: "Project not found or inactive", project: null, entity: null, endpoint: null };
-  }
-
-  const project = projectRows[0]!;
-
-  // Find endpoint by name within project
-  const endpointRows = await db
-    .select()
-    .from(endpoints)
-    .where(
-      and(
-        eq(endpoints.project_id, project.id),
-        eq(endpoints.endpoint_name, endpointName),
-        eq(endpoints.is_active, true)
-      )
-    );
-
-  if (endpointRows.length === 0) {
-    return { error: "Endpoint not found or inactive", project: null, entity: null, endpoint: null };
-  }
-
-  const endpoint = endpointRows[0]!;
-
-  return { project, entity, endpoint, error: null };
-}
-
-/**
- * Helper to find project for glossary lookup (backward compat - no endpoint needed)
- */
-async function findProjectForGlossary(orgPath: string, projectName: string) {
+async function findProject(orgPath: string, projectName: string) {
   // First find entity by slug
   const entity = await findEntityBySlug(orgPath);
   if (!entity) {
@@ -158,83 +105,94 @@ async function findProjectForGlossary(orgPath: string, projectName: string) {
   return { project: projectRows[0]!, entity, error: null };
 }
 
-// POST translate strings - NEW ROUTE with endpointName
-// Route: /translate/:orgPath/:projectName/:endpointName
+/**
+ * Get all unique dictionary terms (texts) for a project
+ */
+async function getDictionaryTermsForProject(entityId: string, projectId: string): Promise<string[]> {
+  const entries = await db
+    .select({ text: dictionaryEntry.text })
+    .from(dictionaryEntry)
+    .innerJoin(dictionary, eq(dictionaryEntry.dictionary_id, dictionary.id))
+    .where(
+      and(
+        eq(dictionary.entity_id, entityId),
+        eq(dictionary.project_id, projectId)
+      )
+    );
+
+  // Return unique terms
+  return [...new Set(entries.map(e => e.text))];
+}
+
+// POST translate strings
+// Route: /translate/:orgPath/:projectName
 translateRouter.post(
-  "/:orgPath/:projectName/:endpointName",
+  "/:orgPath/:projectName",
   rateLimitMiddleware,
   zValidator("param", translateParamSchema),
   zValidator("json", translationRequestSchema),
   async c => {
-    const { orgPath, projectName, endpointName } = c.req.valid("param");
+    const { orgPath, projectName } = c.req.valid("param");
     const body = c.req.valid("json");
 
-    const result = await findProjectAndEndpoint(orgPath, projectName, endpointName);
+    const result = await findProject(orgPath, projectName);
 
-    if (result.error || !result.project || !result.entity || !result.endpoint) {
+    if (result.error || !result.project || !result.entity) {
       return c.json(errorResponse(result.error || "Not found"), 404);
     }
 
-    const { project, entity, endpoint } = result;
+    const { project, entity } = result;
 
-    // Validate IP allowlist (if configured on endpoint)
-    const ipAllowlist = endpoint.ip_allowlist as string[] | null;
+    // Validate IP allowlist (if configured on project)
+    const ipAllowlist = project.ip_allowlist as string[] | null;
     if (ipAllowlist && ipAllowlist.length > 0) {
       const clientIp = getClientIp(c);
       if (!isIpAllowed(clientIp, ipAllowlist)) {
         return c.json(
-          errorResponse(`IP address ${clientIp ?? "unknown"} is not allowed to access this endpoint`),
+          errorResponse(`IP address ${clientIp ?? "unknown"} is not allowed to access this project`),
           403
         );
       }
     }
 
-    // Get all glossary terms for this project
-    const glossaryRows = await db
-      .select({ term: glossaries.term })
-      .from(glossaries)
-      .where(eq(glossaries.project_id, project.id));
-
-    const glossaryTerms = glossaryRows.map(row => row.term);
+    // Get all dictionary terms for this project
+    const dictionaryTerms = await getDictionaryTermsForProject(entity.id, project.id);
 
     // Extract terms found in the input strings
-    const foundTerms = extractGlossaryTerms(body.strings, glossaryTerms);
+    const foundTerms = extractDictionaryTerms(body.strings, dictionaryTerms);
 
-    // Build the glossary callback URL
-    const glossaryCallbackUrl = buildGlossaryCallbackUrl(orgPath, projectName);
+    // Build the dictionary callback URL
+    const dictionaryCallbackUrl = buildDictionaryCallbackUrl(orgPath, projectName);
 
     // Calculate metrics
     const stringCount = body.strings.length;
     const characterCount = body.strings.reduce((acc, s) => acc + s.length, 0);
 
-    // Use endpoint's default target languages if not specified
+    // Use project's default target languages if not specified in request
     const targetLanguages = body.target_languages.length > 0
       ? body.target_languages
-      : (endpoint.default_target_languages as string[] | null) ?? [];
+      : (project.default_target_languages as string[] | null) ?? [];
 
     if (targetLanguages.length === 0) {
       return c.json(
-        errorResponse("No target languages specified and no defaults configured on endpoint"),
+        errorResponse("No target languages specified and no defaults configured on project"),
         400
       );
     }
 
     try {
       // Call the translation service
-      // Note: Instructions from project/endpoint are not passed to translation service
-      // as the TranslationServicePayload type doesn't support them yet
       const translationResult = await translateStrings({
         target_languages: targetLanguages,
         strings: body.strings,
-        glossaries: foundTerms,
-        glossary_callback_url: glossaryCallbackUrl,
+        dictionary_terms: foundTerms,
+        dictionary_callback_url: dictionaryCallbackUrl,
       });
 
       // Log successful usage with entity context
       await db.insert(usageRecords).values({
         entity_id: entity.id,
         project_id: project.id,
-        endpoint_id: endpoint.id,
         request_count: 1,
         string_count: stringCount,
         character_count: characterCount,
@@ -243,7 +201,7 @@ translateRouter.post(
 
       const response: TranslationResponse = {
         translations: translationResult.translations,
-        glossaries_used: foundTerms,
+        dictionary_terms_used: foundTerms,
         request_id: crypto.randomUUID(),
       };
 
@@ -253,7 +211,6 @@ translateRouter.post(
       await db.insert(usageRecords).values({
         entity_id: entity.id,
         project_id: project.id,
-        endpoint_id: endpoint.id,
         request_count: 1,
         string_count: stringCount,
         character_count: characterCount,
@@ -273,47 +230,63 @@ translateRouter.post(
   }
 );
 
-// GET glossary lookup (callback endpoint for translation service)
-// Route: /translate/glossary/:orgPath/:projectName
+// GET dictionary lookup (callback endpoint for translation service)
+// Route: /translate/dictionary/:orgPath/:projectName
 translateRouter.get(
-  "/glossary/:orgPath/:projectName",
-  zValidator("param", glossaryLookupParamSchema),
-  zValidator("query", glossaryLookupQuerySchema),
+  "/dictionary/:orgPath/:projectName",
+  zValidator("param", dictionaryLookupParamSchema),
+  zValidator("query", dictionaryLookupQuerySchema),
   async c => {
     const { orgPath, projectName } = c.req.valid("param");
-    const { glossary, languages } = c.req.valid("query");
+    const { term, languages } = c.req.valid("query");
 
-    const result = await findProjectForGlossary(orgPath, projectName);
+    const result = await findProject(orgPath, projectName);
 
-    if (result.error || !result.project) {
+    if (result.error || !result.project || !result.entity) {
       return c.json(errorResponse(result.error || "Not found"), 404);
     }
 
-    const { project } = result;
+    const { project, entity } = result;
 
-    // Find the glossary entry
-    const glossaryRows = await db
-      .select()
-      .from(glossaries)
+    // Find dictionary entry by searching for the term (case-insensitive)
+    const matchingEntries = await db
+      .select({
+        dictionary_id: dictionaryEntry.dictionary_id,
+      })
+      .from(dictionaryEntry)
+      .innerJoin(dictionary, eq(dictionaryEntry.dictionary_id, dictionary.id))
       .where(
-        and(eq(glossaries.project_id, project.id), eq(glossaries.term, glossary))
-      );
+        and(
+          eq(dictionary.entity_id, entity.id),
+          eq(dictionary.project_id, project.id),
+          sql`LOWER(${dictionaryEntry.text}) = LOWER(${term})`
+        )
+      )
+      .limit(1);
 
-    if (glossaryRows.length === 0) {
-      return c.json(errorResponse("Glossary term not found"), 404);
+    if (matchingEntries.length === 0) {
+      return c.json(errorResponse("Dictionary term not found"), 404);
     }
 
-    const glossaryEntry = glossaryRows[0]!;
+    const dictionaryId = matchingEntries[0]!.dictionary_id;
+
+    // Get all entries for this dictionary
+    const allEntries = await db
+      .select()
+      .from(dictionaryEntry)
+      .where(eq(dictionaryEntry.dictionary_id, dictionaryId));
+
     const requestedLanguages = languages.split(",").map(l => l.trim());
 
     // Build response with ALL requested languages (null if missing)
     const translations: Record<string, string | null> = {};
     for (const lang of requestedLanguages) {
-      translations[lang] = glossaryEntry.translations[lang] ?? null;
+      const entry = allEntries.find(e => e.language_code === lang);
+      translations[lang] = entry?.text ?? null;
     }
 
-    const response: GlossaryLookupResponse = {
-      glossary: glossaryEntry.term,
+    const response: DictionaryLookupResponse = {
+      term,
       translations,
     };
 
