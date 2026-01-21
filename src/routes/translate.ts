@@ -16,7 +16,6 @@ import {
 } from "@sudobility/whisperly_types";
 import {
   translateStrings,
-  buildDictionaryCallbackUrl,
   extractDictionaryTerms,
 } from "../services/translation";
 import { rateLimitMiddleware } from "../middleware/rateLimit";
@@ -161,9 +160,6 @@ translateRouter.post(
     // Extract terms found in the input strings
     const foundTerms = extractDictionaryTerms(body.strings, dictionaryTerms);
 
-    // Build the dictionary callback URL
-    const dictionaryCallbackUrl = buildDictionaryCallbackUrl(orgPath, projectName);
-
     // Calculate metrics
     const stringCount = body.strings.length;
     const characterCount = body.strings.reduce((acc, s) => acc + s.length, 0);
@@ -183,10 +179,8 @@ translateRouter.post(
     try {
       // Call the translation service
       const translationResult = await translateStrings({
-        target_languages: targetLanguages,
-        strings: body.strings,
-        dictionary_terms: foundTerms,
-        dictionary_callback_url: dictionaryCallbackUrl,
+        texts: body.strings,
+        target_language_codes: targetLanguages,
       });
 
       // Log successful usage with entity context
@@ -199,8 +193,19 @@ translateRouter.post(
         success: true,
       });
 
+      // Transform string[][] to Record<string, string[]>
+      // translationResult.translations[i] = translations for input string i in each target language
+      // We need to reorganize to: { langCode: [translations for all input strings] }
+      const translationsByLanguage: Record<string, string[]> = {};
+      for (let langIdx = 0; langIdx < targetLanguages.length; langIdx++) {
+        const langCode = targetLanguages[langIdx]!;
+        translationsByLanguage[langCode] = translationResult.translations.map(
+          (textTranslations) => textTranslations[langIdx] ?? ''
+        );
+      }
+
       const response: TranslationResponse = {
-        translations: translationResult.translations,
+        translations: translationsByLanguage,
         dictionary_terms_used: foundTerms,
         request_id: crypto.randomUUID(),
       };
