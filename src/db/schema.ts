@@ -94,6 +94,28 @@ export const projects = whisperlySchema.table(
 );
 
 // =============================================================================
+// Project Languages Table
+// Stores selected target languages for a project
+// =============================================================================
+
+export const projectLanguages = whisperlySchema.table(
+  "project_languages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    project_id: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" })
+      .unique(),
+    languages: text("languages").notNull().default("en"),
+    created_at: timestamp("created_at").defaultNow(),
+    updated_at: timestamp("updated_at").defaultNow(),
+  },
+  table => ({
+    projectIdx: index("whisperly_project_languages_project_idx").on(table.project_id),
+  })
+);
+
+// =============================================================================
 // Dictionary Table
 // Groups related translation entries together
 // =============================================================================

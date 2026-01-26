@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { firebaseAuthMiddleware } from "../middleware/firebaseAuth";
 import projectsRouter from "./projects";
 import dictionaryRouter from "./dictionary";
+import projectLanguagesRouter from "./project-languages";
+import availableLanguagesRouter from "./available-languages";
 import settingsRouter from "./settings";
 import analyticsRouter from "./analytics";
 import translateRouter from "./translate";
@@ -26,8 +28,15 @@ adminRoutes.route(
   "/entities/:entitySlug/projects/:projectId/dictionary",
   dictionaryRouter
 );
+adminRoutes.route(
+  "/entities/:entitySlug/projects/:projectId/languages",
+  projectLanguagesRouter
+);
 adminRoutes.route("/entities/:entitySlug/analytics", analyticsRouter);
 adminRoutes.route("/ratelimits/:rateLimitUserId", ratelimitsRouter);
+
+// Config routes
+adminRoutes.route("/available-languages", availableLanguagesRouter);
 
 // Entity management routes
 adminRoutes.route("/entities", entitiesRouter);
@@ -45,6 +54,8 @@ export default routes;
 export {
   projectsRouter,
   dictionaryRouter,
+  projectLanguagesRouter,
+  availableLanguagesRouter,
   settingsRouter,
   analyticsRouter,
   translateRouter,

@@ -130,6 +130,26 @@ export async function initDatabase() {
   `;
 
   // =============================================================================
+  // Step 3b: Create project_languages table
+  // Stores selected target languages for each project
+  // =============================================================================
+
+  await client`
+    CREATE TABLE IF NOT EXISTS whisperly.project_languages (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      project_id UUID NOT NULL UNIQUE REFERENCES whisperly.projects(id) ON DELETE CASCADE,
+      languages TEXT NOT NULL DEFAULT 'en',
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `;
+
+  await client`
+    CREATE INDEX IF NOT EXISTS whisperly_project_languages_project_idx
+    ON whisperly.project_languages (project_id)
+  `;
+
+  // =============================================================================
   // Step 4: Create dictionary tables
   // =============================================================================
 
@@ -185,15 +205,6 @@ export async function initDatabase() {
   // Step 6: Create usage_records table
   // =============================================================================
 
-  // Remove endpoint_id column if it exists (migrating from old schema)
-  await client`
-    DO $$ BEGIN
-      ALTER TABLE whisperly.usage_records DROP COLUMN IF EXISTS endpoint_id;
-    EXCEPTION
-      WHEN undefined_column THEN null;
-    END $$;
-  `;
-
   await client`
     CREATE TABLE IF NOT EXISTS whisperly.usage_records (
       uuid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -206,6 +217,15 @@ export async function initDatabase() {
       success BOOLEAN NOT NULL,
       error_message TEXT
     )
+  `;
+
+  // Remove endpoint_id column if it exists (migrating from old schema)
+  await client`
+    DO $$ BEGIN
+      ALTER TABLE whisperly.usage_records DROP COLUMN IF EXISTS endpoint_id;
+    EXCEPTION
+      WHEN undefined_column THEN null;
+    END $$;
   `;
 
   // Create indexes for analytics queries

@@ -156,6 +156,14 @@ export const analyticsQuerySchema = z.object({
 });
 
 // =============================================================================
+// Project Languages Schemas
+// =============================================================================
+
+export const projectLanguagesUpdateSchema = z.object({
+  languages: z.string().min(2), // At least one language code like "en"
+});
+
+// =============================================================================
 // Subscription Schemas
 // =============================================================================
 
