@@ -7,6 +7,8 @@ import {
   RateLimitPeriodType,
   type RateLimitsConfigResponse,
   type RateLimitHistoryResponse,
+  type RateLimitsConfigData,
+  type RateLimitTier,
 } from "@sudobility/types";
 import { getRateLimitRouteHandler, rateLimitsConfig, getTestMode } from "../middleware/rateLimit";
 import { getEnv } from "../lib/env-helper";
@@ -32,6 +34,31 @@ const helpers = createEntityHelpers(config);
 function isRevenueCatConfigured(): boolean {
   const key = getEnv("REVENUECAT_API_KEY");
   return !!key && key.length > 0;
+}
+
+/**
+ * Display names for entitlement tiers
+ */
+const TIER_DISPLAY_NAMES: Record<string, string> = {
+  none: "Free",
+  whisperly: "Whisperly",
+  pro: "Pro",
+  enterprise: "Enterprise",
+};
+
+/**
+ * Convert rateLimitsConfig object to array of RateLimitTier objects
+ */
+function convertConfigToTiersArray(): RateLimitTier[] {
+  return Object.entries(rateLimitsConfig).map(([entitlement, limits]) => ({
+    entitlement,
+    displayName: TIER_DISPLAY_NAMES[entitlement] || entitlement,
+    limits: {
+      hourly: limits.hourly ?? null,
+      daily: limits.daily ?? null,
+      monthly: limits.monthly ?? null,
+    },
+  }));
 }
 
 /**
@@ -80,16 +107,21 @@ ratelimitsRouter.get("/", async c => {
     // If RevenueCat is not configured, return static config without usage data
     if (!isRevenueCatConfigured()) {
       const noneLimits = rateLimitsConfig.none;
-      return c.json(successResponse({
-        tiers: rateLimitsConfig,
+      const fallbackData: RateLimitsConfigData = {
+        tiers: convertConfigToTiersArray(),
         currentEntitlement: "none",
-        currentLimits: noneLimits,
-        currentUsage: {
-          hourly: { used: 0, limit: noneLimits.hourly ?? 0, remaining: noneLimits.hourly ?? 0 },
-          daily: { used: 0, limit: noneLimits.daily ?? 0, remaining: noneLimits.daily ?? 0 },
-          monthly: { used: 0, limit: noneLimits.monthly ?? 0, remaining: noneLimits.monthly ?? 0 },
+        currentLimits: {
+          hourly: noneLimits.hourly ?? null,
+          daily: noneLimits.daily ?? null,
+          monthly: noneLimits.monthly ?? null,
         },
-      }));
+        currentUsage: {
+          hourly: 0,
+          daily: 0,
+          monthly: 0,
+        },
+      };
+      return c.json(successResponse(fallbackData) as RateLimitsConfigResponse);
     }
 
     const firebaseUser = c.get("firebaseUser");
