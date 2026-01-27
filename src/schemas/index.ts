@@ -77,21 +77,21 @@ export const projectCreateSchema = z.object({
       "Must be lowercase alphanumeric with optional hyphens"
     ),
   display_name: z.string().min(1).max(255),
-  description: z.string().max(1000).optional(),
-  instructions: z.string().max(10000).optional(),
-  default_source_language: z.string().min(2).max(10).optional(),
-  default_target_languages: z.array(z.string().min(2).max(10)).optional(),
-  ip_allowlist: z.array(z.string()).optional(),
+  description: z.string().max(1000).nullish(),
+  instructions: z.string().max(10000).nullish(),
+  default_source_language: z.string().min(2).max(10).nullish(),
+  default_target_languages: z.array(z.string().min(2).max(10)).nullish(),
+  ip_allowlist: z.array(z.string()).nullish(),
 });
 
 export const projectUpdateSchema = z.object({
   project_name: z.string().min(1).max(255).regex(projectNameRegex).optional(),
   display_name: z.string().min(1).max(255).optional(),
-  description: z.string().max(1000).optional(),
-  instructions: z.string().max(10000).optional(),
-  default_source_language: z.string().min(2).max(10).nullable().optional(),
-  default_target_languages: z.array(z.string().min(2).max(10)).nullable().optional(),
-  ip_allowlist: z.array(z.string()).nullable().optional(),
+  description: z.string().max(1000).nullish(),
+  instructions: z.string().max(10000).nullish(),
+  default_source_language: z.string().min(2).max(10).nullish(),
+  default_target_languages: z.array(z.string().min(2).max(10)).nullish(),
+  ip_allowlist: z.array(z.string()).nullish(),
   is_active: z.boolean().optional(),
 });
 
