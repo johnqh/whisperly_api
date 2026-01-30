@@ -171,7 +171,7 @@ async function setup() {
 
     // Create rate_limit_counters table
     console.log("Creating rate_limit_counters table...");
-    await initRateLimitTable(client, SCHEMA, INDEX_PREFIX);
+    await initRateLimitTable(client as any, SCHEMA, INDEX_PREFIX);
 
     console.log("Database setup completed successfully!");
   } catch (error) {

@@ -243,7 +243,7 @@ export async function initDatabase() {
   // Step 7: Rate limit counters table
   // =============================================================================
 
-  await initRateLimitTable(client, "whisperly", "whisperly");
+  await initRateLimitTable(client as any, "whisperly", "whisperly");
 
   console.log("Database tables initialized");
 }
