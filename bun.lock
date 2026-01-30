@@ -5,7 +5,7 @@
       "name": "whisperly_api",
       "dependencies": {
         "@hono/zod-validator": "^0.7.5",
-        "@sudobility/auth_lib": "^0.0.30",
+        "@sudobility/auth_lib": "^0.0.31",
         "@sudobility/auth_service": "^1.1.1",
         "@sudobility/entity_service": "^1.0.15",
         "@sudobility/ratelimit_service": "^1.0.17",
@@ -347,7 +347,7 @@
 
     "@standard-schema/spec": ["@standard-schema/spec@1.1.0", "", {}, "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="],
 
-    "@sudobility/auth_lib": ["@sudobility/auth_lib@0.0.30", "", { "peerDependencies": { "@react-native-firebase/app": ">=18.0.0", "@react-native-firebase/auth": ">=18.0.0", "@sudobility/di": "^1.5.30", "@sudobility/di_rn": "^0.1.13", "@sudobility/di_web": "^0.1.88", "@sudobility/types": "^1.9.48", "@tanstack/react-query": "^5.0.0", "firebase": "^12.7.0", "react": "^18.0.0 || ^19.0.0" }, "optionalPeers": ["@react-native-firebase/app", "@react-native-firebase/auth", "@sudobility/di_rn", "@sudobility/di_web", "firebase"] }, "sha512-MJa7MqvLI0VoD++A7ZG/VaHagfbb/EmbRIqzRismmHJOXoyTK2P5e1KeekPml8Pw5JDggE23g9489XCPQACzVg=="],
+    "@sudobility/auth_lib": ["@sudobility/auth_lib@0.0.31", "", { "peerDependencies": { "@react-native-firebase/app": ">=18.0.0", "@react-native-firebase/auth": ">=18.0.0", "@sudobility/di": "^1.5.30", "@sudobility/di_rn": "^0.1.14", "@sudobility/di_web": "^0.1.89", "@sudobility/types": "^1.9.48", "@tanstack/react-query": "^5.0.0", "firebase": "^12.7.0", "react": "^18.0.0 || ^19.0.0" }, "optionalPeers": ["@react-native-firebase/app", "@react-native-firebase/auth", "@sudobility/di_rn", "@sudobility/di_web", "firebase"] }, "sha512-eNDnd3mhG0gxjOu/jE9A6MZhAUssqb/lQNiHS0iJVxfoVVAIb1xO967kEvHSftSfrv7WUR8Z6iFzVx6XNFk9aA=="],
 
     "@sudobility/auth_service": ["@sudobility/auth_service@1.1.1", "", { "peerDependencies": { "@sudobility/types": "^1.9.48", "firebase-admin": "^13.0.0" } }, "sha512-WLRoz/ml1YZvvEXPZEJpj9Xb543wvxOQViG2ZtJ/pptZT2G+ZBxBSRU2Vqtji4EM8JwqLuoL4urH7jm270FTwQ=="],
 

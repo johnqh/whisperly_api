@@ -17,6 +17,7 @@ import {
 import {
   translateStrings,
   extractDictionaryTerms,
+  TranslationServiceError,
 } from "../services/translation";
 import { rateLimitMiddleware } from "../middleware/rateLimit";
 
@@ -183,15 +184,19 @@ translateRouter.post(
         target_language_codes: targetLanguages,
       });
 
-      // Log successful usage with entity context
-      await db.insert(usageRecords).values({
-        entity_id: entity.id,
-        project_id: project.id,
-        request_count: 1,
-        string_count: stringCount,
-        character_count: characterCount,
-        success: true,
-      });
+      // Log successful usage with entity context (don't let logging failure break the response)
+      try {
+        await db.insert(usageRecords).values({
+          entity_id: entity.id,
+          project_id: project.id,
+          request_count: 1,
+          string_count: stringCount,
+          character_count: characterCount,
+          success: true,
+        });
+      } catch (logError) {
+        console.error("Failed to log usage record:", logError);
+      }
 
       // Transform string[][] to Record<string, string[]>
       // translationResult.translations[i] = translations for input string i in each target language
@@ -212,23 +217,31 @@ translateRouter.post(
 
       return c.json(successResponse(response));
     } catch (error) {
-      // Log failed usage with entity context
-      await db.insert(usageRecords).values({
-        entity_id: entity.id,
-        project_id: project.id,
-        request_count: 1,
-        string_count: stringCount,
-        character_count: characterCount,
-        success: false,
-        error_message: error instanceof Error ? error.message : "Unknown error",
-      });
+      // Get detailed error message
+      let errorMessage = "Unknown error";
+      if (error instanceof TranslationServiceError) {
+        errorMessage = error.toDetailedMessage();
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      // Log failed usage with entity context (don't let logging failure cascade)
+      try {
+        await db.insert(usageRecords).values({
+          entity_id: entity.id,
+          project_id: project.id,
+          request_count: 1,
+          string_count: stringCount,
+          character_count: characterCount,
+          success: false,
+          error_message: errorMessage.slice(0, 500), // Truncate for DB
+        });
+      } catch (logError) {
+        console.error("Failed to log usage record:", logError);
+      }
 
       return c.json(
-        errorResponse(
-          error instanceof Error
-            ? `Translation failed: ${error.message}`
-            : "Translation failed"
-        ),
+        errorResponse(`Translation failed: ${errorMessage}`),
         500
       );
     }

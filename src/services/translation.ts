@@ -5,12 +5,68 @@ import type {
 } from "@sudobility/whisperly_types";
 
 /**
+ * Custom error class that includes translation service request/response details
+ */
+export class TranslationServiceError extends Error {
+  constructor(
+    message: string,
+    public readonly serviceUrl: string,
+    public readonly requestPayload: TranslationServicePayload,
+    public readonly responseStatus?: number,
+    public readonly responseBody?: string
+  ) {
+    super(message);
+    this.name = "TranslationServiceError";
+  }
+
+  toDetailedMessage(): string {
+    const parts = [
+      this.message,
+      `\nService URL: ${this.serviceUrl}`,
+      `\nRequest payload: ${JSON.stringify(this.requestPayload, null, 2)}`,
+    ];
+    if (this.responseStatus !== undefined) {
+      parts.push(`\nResponse status: ${this.responseStatus}`);
+    }
+    if (this.responseBody) {
+      parts.push(`\nResponse body: ${this.responseBody}`);
+    }
+    return parts.join("");
+  }
+}
+
+/**
+ * Generate mock translations for development when translation service is unavailable
+ */
+function generateMockTranslations(
+  payload: TranslationServicePayload
+): TranslationServiceResponse {
+  // Return the original text with a [lang] prefix for each target language
+  const translations = payload.texts.map(text =>
+    payload.target_language_codes.map(lang => `[${lang}] ${text}`)
+  );
+
+  return {
+    translations,
+    detected_source_language: payload.source_language_code || "en",
+  };
+}
+
+/**
  * Call the external translation service
  */
 export async function translateStrings(
   payload: TranslationServicePayload
 ): Promise<TranslationServiceResponse> {
-  const translationServiceUrl = getRequiredEnv("TRANSLATION_SERVICE_URL");
+  const translationServiceUrl = getEnv("TRANSLATION_SERVICE_URL");
+  const useMockFallback = getEnv("TRANSLATION_MOCK_FALLBACK") === "true";
+
+  // If no URL configured, use mock in development
+  if (!translationServiceUrl) {
+    console.warn("TRANSLATION_SERVICE_URL not configured, using mock translations");
+    return generateMockTranslations(payload);
+  }
+
   const timeout = parseInt(getEnv("TRANSLATION_SERVICE_TIMEOUT", "120000")!);
 
   const controller = new AbortController();
@@ -30,18 +86,42 @@ export async function translateStrings(
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(
-        `Translation service error: ${response.status} - ${errorText}`
+      throw new TranslationServiceError(
+        `Translation service error: ${response.status}`,
+        translationServiceUrl,
+        payload,
+        response.status,
+        errorText
       );
     }
 
     return (await response.json()) as TranslationServiceResponse;
   } catch (error) {
     clearTimeout(timeoutId);
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new Error("Translation service request timed out");
+
+    // If mock fallback is enabled, return mock translations instead of failing
+    if (useMockFallback) {
+      console.warn("Translation service unavailable, using mock fallback:",
+        error instanceof Error ? error.message : error);
+      return generateMockTranslations(payload);
     }
-    throw error;
+
+    if (error instanceof TranslationServiceError) {
+      throw error;
+    }
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new TranslationServiceError(
+        "Translation service request timed out",
+        translationServiceUrl,
+        payload
+      );
+    }
+    // Wrap other errors with context
+    throw new TranslationServiceError(
+      error instanceof Error ? error.message : "Unknown error",
+      translationServiceUrl,
+      payload
+    );
   }
 }
 

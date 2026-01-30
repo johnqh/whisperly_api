@@ -130,9 +130,8 @@ export function getTestMode(c: Context): boolean {
 export async function rateLimitMiddleware(c: Context, next: Next) {
   const orgPath = c.req.param("orgPath");
   const projectName = c.req.param("projectName");
-  const endpointName = c.req.param("endpointName");
 
-  if (!orgPath || !projectName || !endpointName) {
+  if (!orgPath || !projectName) {
     return c.json(errorResponse("Invalid path parameters"), 400);
   }
 
@@ -152,6 +151,13 @@ export async function rateLimitMiddleware(c: Context, next: Next) {
 
   // Store the entity ID for rate limiting
   c.set("rateLimitEntityId", entityId);
+
+  // Skip rate limiting if RevenueCat is not configured
+  const revenueCatApiKey = getEnv("REVENUECAT_API_KEY");
+  if (!revenueCatApiKey) {
+    await next();
+    return;
+  }
 
   // Apply rate limiting using subscription_service (per-entity)
   // Cast to any to avoid type conflicts between different hono instances

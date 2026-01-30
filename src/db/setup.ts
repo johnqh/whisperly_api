@@ -81,6 +81,23 @@ async function setup() {
       ON ${SCHEMA}.projects (entity_id)
     `);
 
+    // Create project_languages table
+    console.log("Creating project_languages table...");
+    await client.unsafe(`
+      CREATE TABLE IF NOT EXISTS ${SCHEMA}.project_languages (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        project_id UUID NOT NULL UNIQUE REFERENCES ${SCHEMA}.projects(id) ON DELETE CASCADE,
+        languages TEXT NOT NULL DEFAULT 'en',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    await client.unsafe(`
+      CREATE INDEX IF NOT EXISTS ${INDEX_PREFIX}_project_languages_project_idx
+      ON ${SCHEMA}.project_languages (project_id)
+    `);
+
     // Create dictionary table
     console.log("Creating dictionary table...");
     await client.unsafe(`
