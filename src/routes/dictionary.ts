@@ -81,6 +81,56 @@ async function getDictionaryTranslations(dictionaryId: string): Promise<Dictiona
   return translations;
 }
 
+// GET list all dictionaries for a project
+dictionaryRouter.get(
+  "/",
+  zValidator("param", entityProjectIdParamSchema),
+  async c => {
+    const userId = c.get("firebaseUser").uid;
+    const { entitySlug, projectId } = c.req.valid("param");
+
+    const result = await getEntityWithPermission(entitySlug, userId);
+    if (result.error) {
+      return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+    }
+
+    const project = await verifyProjectOwnership(result.entity.id, projectId);
+    if (!project) {
+      return c.json(errorResponse("Project not found"), 404);
+    }
+
+    // Get all dictionaries for this project
+    const dictionaries = await db
+      .select({
+        id: dictionary.id,
+        created_at: dictionary.created_at,
+        updated_at: dictionary.updated_at,
+      })
+      .from(dictionary)
+      .where(
+        and(
+          eq(dictionary.entity_id, result.entity.id),
+          eq(dictionary.project_id, projectId)
+        )
+      );
+
+    // Get translations for each dictionary
+    const results = await Promise.all(
+      dictionaries.map(async dict => {
+        const translations = await getDictionaryTranslations(dict.id);
+        return {
+          dictionary_id: dict.id,
+          translations,
+          created_at: dict.created_at,
+          updated_at: dict.updated_at,
+        };
+      })
+    );
+
+    return c.json(successResponse(results));
+  }
+);
+
 // GET search dictionary by language_code and text (case-insensitive exact match)
 dictionaryRouter.get(
   "/search/:language_code/:text",

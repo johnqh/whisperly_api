@@ -141,8 +141,9 @@ async function isEntityOwnedBySiteAdmin(entityId: string): Promise<boolean> {
   }
 
   // Find the owner of the personal entity
+  // Note: entityMembers uses 'user_id' column for firebase_uid
   const ownerMember = await db
-    .select({ firebase_uid: entityMembers.firebase_uid })
+    .select({ user_id: entityMembers.user_id })
     .from(entityMembers)
     .where(
       and(
@@ -160,7 +161,7 @@ async function isEntityOwnedBySiteAdmin(entityId: string): Promise<boolean> {
   const ownerUser = await db
     .select({ email: users.email })
     .from(users)
-    .where(eq(users.firebase_uid, ownerMember[0]!.firebase_uid))
+    .where(eq(users.firebase_uid, ownerMember[0]!.user_id))
     .limit(1);
 
   if (ownerUser.length === 0 || !ownerUser[0]!.email) {

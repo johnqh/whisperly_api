@@ -62,12 +62,23 @@ function isIpAllowed(clientIp: string | null, allowlist: string[] | null): boole
 /**
  * Find entity by slug (organization path).
  * The organization path in the public API URL is now the entity slug.
+ * Note: We use explicit column selection because the entities table is created
+ * via a factory function and bare .select() doesn't work with Drizzle in this case.
  */
 async function findEntityBySlug(
   entitySlug: string
 ): Promise<typeof entities.$inferSelect | null> {
   const entityRows = await db
-    .select()
+    .select({
+      id: entities.id,
+      entity_slug: entities.entity_slug,
+      entity_type: entities.entity_type,
+      display_name: entities.display_name,
+      description: entities.description,
+      avatar_url: entities.avatar_url,
+      created_at: entities.created_at,
+      updated_at: entities.updated_at,
+    })
     .from(entities)
     .where(eq(entities.entity_slug, entitySlug));
 
@@ -290,7 +301,14 @@ translateRouter.get(
 
     // Get all entries for this dictionary
     const allEntries = await db
-      .select()
+      .select({
+        id: dictionaryEntry.id,
+        dictionary_id: dictionaryEntry.dictionary_id,
+        language_code: dictionaryEntry.language_code,
+        text: dictionaryEntry.text,
+        created_at: dictionaryEntry.created_at,
+        updated_at: dictionaryEntry.updated_at,
+      })
       .from(dictionaryEntry)
       .where(eq(dictionaryEntry.dictionary_id, dictionaryId));
 
