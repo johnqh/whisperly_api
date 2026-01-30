@@ -1,5 +1,5 @@
 import type { Context, Next } from "hono";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import {
   createRateLimitMiddleware,
   RateLimitRouteHandler,
@@ -7,10 +7,11 @@ import {
   RateLimitChecker,
 } from "@sudobility/ratelimit_service";
 import { SubscriptionHelper } from "@sudobility/subscription_service";
-import { db, rateLimitCounters, entities } from "../db";
+import { db, rateLimitCounters, entities, entityMembers, users } from "../db";
 import { errorResponse } from "@sudobility/whisperly_types";
 import { getEnv, getRequiredEnv } from "../lib/env-helper";
 import { rateLimitsConfig } from "../config/rateLimits";
+import { isSiteAdmin } from "../services/firebase";
 
 // Re-export for backward compatibility
 export { rateLimitsConfig };
@@ -121,6 +122,56 @@ export function getTestMode(c: Context): boolean {
 }
 
 /**
+ * Check if an entity is owned by a site admin.
+ * Site admins' personal entities are exempt from rate limiting.
+ *
+ * Conditions:
+ * 1. The entity must be a personal entity (entity_type === "personal")
+ * 2. The owner's email is in the site admin list
+ */
+async function isEntityOwnedBySiteAdmin(entityId: string): Promise<boolean> {
+  // Find the entity and check if it's personal
+  const entityRows = await db
+    .select({ entity_type: entities.entity_type })
+    .from(entities)
+    .where(eq(entities.id, entityId));
+
+  if (entityRows.length === 0 || entityRows[0]!.entity_type !== "personal") {
+    return false;
+  }
+
+  // Find the owner of the personal entity
+  const ownerMember = await db
+    .select({ firebase_uid: entityMembers.firebase_uid })
+    .from(entityMembers)
+    .where(
+      and(
+        eq(entityMembers.entity_id, entityId),
+        eq(entityMembers.role, "owner")
+      )
+    )
+    .limit(1);
+
+  if (ownerMember.length === 0) {
+    return false;
+  }
+
+  // Look up the owner's email from the users table
+  const ownerUser = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.firebase_uid, ownerMember[0]!.firebase_uid))
+    .limit(1);
+
+  if (ownerUser.length === 0 || !ownerUser[0]!.email) {
+    return false;
+  }
+
+  // Check if the owner's email is a site admin
+  return isSiteAdmin(ownerUser[0]!.email);
+}
+
+/**
  * Rate limiting middleware for translation endpoints.
  *
  * This middleware:
@@ -159,10 +210,16 @@ export async function rateLimitMiddleware(c: Context, next: Next) {
     return;
   }
 
+  // Skip rate limiting for site admin's personal entities
+  if (await isEntityOwnedBySiteAdmin(entityId)) {
+    await next();
+    return;
+  }
+
   // Apply rate limiting using subscription_service (per-entity)
   // Cast to any to avoid type conflicts between different hono instances
   const middleware = getRateLimitMiddleware();
-  await middleware(c as any, next as any);
+  return middleware(c as any, next as any);
 }
 
 // Extend Hono context types

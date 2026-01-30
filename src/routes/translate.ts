@@ -17,7 +17,6 @@ import {
 import {
   translateStrings,
   extractDictionaryTerms,
-  TranslationServiceError,
 } from "../services/translation";
 import { rateLimitMiddleware } from "../middleware/rateLimit";
 
@@ -177,54 +176,14 @@ translateRouter.post(
       );
     }
 
-    try {
-      // Call the translation service
-      const translationResult = await translateStrings({
-        texts: body.strings,
-        target_language_codes: targetLanguages,
-      });
+    // Call the translation service
+    const translationResult = await translateStrings({
+      texts: body.strings,
+      target_language_codes: targetLanguages,
+    });
 
-      // Log successful usage with entity context (don't let logging failure break the response)
-      try {
-        await db.insert(usageRecords).values({
-          entity_id: entity.id,
-          project_id: project.id,
-          request_count: 1,
-          string_count: stringCount,
-          character_count: characterCount,
-          success: true,
-        });
-      } catch (logError) {
-        console.error("Failed to log usage record:", logError);
-      }
-
-      // Transform string[][] to Record<string, string[]>
-      // translationResult.translations[i] = translations for input string i in each target language
-      // We need to reorganize to: { langCode: [translations for all input strings] }
-      const translationsByLanguage: Record<string, string[]> = {};
-      for (let langIdx = 0; langIdx < targetLanguages.length; langIdx++) {
-        const langCode = targetLanguages[langIdx]!;
-        translationsByLanguage[langCode] = translationResult.translations.map(
-          (textTranslations) => textTranslations[langIdx] ?? ''
-        );
-      }
-
-      const response: TranslationResponse = {
-        translations: translationsByLanguage,
-        dictionary_terms_used: foundTerms,
-        request_id: crypto.randomUUID(),
-      };
-
-      return c.json(successResponse(response));
-    } catch (error) {
-      // Get detailed error message
-      let errorMessage = "Unknown error";
-      if (error instanceof TranslationServiceError) {
-        errorMessage = error.toDetailedMessage();
-      } else if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-
+    // Handle translation service failure
+    if (!translationResult.success || !translationResult.data) {
       // Log failed usage with entity context (don't let logging failure cascade)
       try {
         await db.insert(usageRecords).values({
@@ -234,17 +193,58 @@ translateRouter.post(
           string_count: stringCount,
           character_count: characterCount,
           success: false,
-          error_message: errorMessage.slice(0, 500), // Truncate for DB
+          error_message: (translationResult.error ?? "Unknown error").slice(0, 500),
         });
       } catch (logError) {
         console.error("Failed to log usage record:", logError);
       }
 
       return c.json(
-        errorResponse(`Translation failed: ${errorMessage}`),
+        {
+          success: false,
+          error: `Translation failed: ${translationResult.error ?? "Unknown error"}`,
+          timestamp: new Date().toISOString(),
+          debug: translationResult.debug,
+        },
         500
       );
     }
+
+    // Log successful usage with entity context (don't let logging failure break the response)
+    try {
+      await db.insert(usageRecords).values({
+        entity_id: entity.id,
+        project_id: project.id,
+        request_count: 1,
+        string_count: stringCount,
+        character_count: characterCount,
+        success: true,
+      });
+    } catch (logError) {
+      console.error("Failed to log usage record:", logError);
+    }
+
+    // Transform string[][] to Record<string, string[]>
+    // translationResult.data.translations[lang_index] = array of translations for that language
+    // Each inner array contains translations for all input strings in that language
+    const translationsByLanguage: Record<string, string[]> = {};
+    for (let langIdx = 0; langIdx < targetLanguages.length; langIdx++) {
+      const langCode = targetLanguages[langIdx]!;
+      translationsByLanguage[langCode] = translationResult.data.translations[langIdx] ?? [];
+    }
+
+    const response: TranslationResponse = {
+      translations: translationsByLanguage,
+      dictionary_terms_used: foundTerms,
+      request_id: crypto.randomUUID(),
+    };
+
+    return c.json({
+      success: true,
+      data: response,
+      timestamp: new Date().toISOString(),
+      debug: translationResult.debug,
+    });
   }
 );
 

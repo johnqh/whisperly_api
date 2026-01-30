@@ -1,38 +1,26 @@
-import { getRequiredEnv, getEnv } from "../lib/env-helper";
+import { getEnv } from "../lib/env-helper";
 import type {
   TranslationServicePayload,
   TranslationServiceResponse,
 } from "@sudobility/whisperly_types";
 
 /**
- * Custom error class that includes translation service request/response details
+ * Debug info for translation service calls
  */
-export class TranslationServiceError extends Error {
-  constructor(
-    message: string,
-    public readonly serviceUrl: string,
-    public readonly requestPayload: TranslationServicePayload,
-    public readonly responseStatus?: number,
-    public readonly responseBody?: string
-  ) {
-    super(message);
-    this.name = "TranslationServiceError";
-  }
+export interface TranslationDebugInfo {
+  translation_service_url: string | null;
+  payload: TranslationServicePayload | null;
+  response: unknown | null;
+}
 
-  toDetailedMessage(): string {
-    const parts = [
-      this.message,
-      `\nService URL: ${this.serviceUrl}`,
-      `\nRequest payload: ${JSON.stringify(this.requestPayload, null, 2)}`,
-    ];
-    if (this.responseStatus !== undefined) {
-      parts.push(`\nResponse status: ${this.responseStatus}`);
-    }
-    if (this.responseBody) {
-      parts.push(`\nResponse body: ${this.responseBody}`);
-    }
-    return parts.join("");
-  }
+/**
+ * Result of a translation service call
+ */
+export interface TranslationResult {
+  success: boolean;
+  data?: TranslationServiceResponse;
+  error?: string;
+  debug: TranslationDebugInfo;
 }
 
 /**
@@ -54,17 +42,26 @@ function generateMockTranslations(
 
 /**
  * Call the external translation service
+ * Returns a result object with debug info always included
  */
 export async function translateStrings(
   payload: TranslationServicePayload
-): Promise<TranslationServiceResponse> {
+): Promise<TranslationResult> {
   const translationServiceUrl = getEnv("TRANSLATION_SERVICE_URL");
   const useMockFallback = getEnv("TRANSLATION_MOCK_FALLBACK") === "true";
+
+  const debug: TranslationDebugInfo = {
+    translation_service_url: translationServiceUrl || null,
+    payload,
+    response: null,
+  };
 
   // If no URL configured, use mock in development
   if (!translationServiceUrl) {
     console.warn("TRANSLATION_SERVICE_URL not configured, using mock translations");
-    return generateMockTranslations(payload);
+    const mockData = generateMockTranslations(payload);
+    debug.response = mockData;
+    return { success: true, data: mockData, debug };
   }
 
   const timeout = parseInt(getEnv("TRANSLATION_SERVICE_TIMEOUT", "120000")!);
@@ -84,18 +81,61 @@ export async function translateStrings(
 
     clearTimeout(timeoutId);
 
+    const responseText = await response.text();
+
+    // Try to parse as JSON for debug info
+    let responseJson: unknown = null;
+    try {
+      responseJson = JSON.parse(responseText);
+    } catch {
+      // Keep as text if not valid JSON
+      responseJson = responseText;
+    }
+    debug.response = responseJson;
+
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new TranslationServiceError(
-        `Translation service error: ${response.status}`,
-        translationServiceUrl,
-        payload,
-        response.status,
-        errorText
-      );
+      return {
+        success: false,
+        error: `Translation service error: ${response.status}`,
+        debug,
+      };
     }
 
-    return (await response.json()) as TranslationServiceResponse;
+    // Validate response format
+    if (!responseJson || typeof responseJson !== "object") {
+      return {
+        success: false,
+        error: "Translation service returned invalid response format",
+        debug,
+      };
+    }
+
+    const typedResult = responseJson as Record<string, unknown>;
+
+    // Handle nested response format: { success, data: { output: { translations, ... } } }
+    let translationData: Record<string, unknown> = typedResult;
+    if (typedResult.data && typeof typedResult.data === "object") {
+      const dataObj = typedResult.data as Record<string, unknown>;
+      if (dataObj.output && typeof dataObj.output === "object") {
+        translationData = dataObj.output as Record<string, unknown>;
+      } else {
+        translationData = dataObj;
+      }
+    }
+
+    if (!Array.isArray(translationData.translations)) {
+      return {
+        success: false,
+        error: `Translation service response missing 'translations' array (got ${typeof translationData.translations})`,
+        debug,
+      };
+    }
+
+    return {
+      success: true,
+      data: translationData as unknown as TranslationServiceResponse,
+      debug,
+    };
   } catch (error) {
     clearTimeout(timeoutId);
 
@@ -103,25 +143,20 @@ export async function translateStrings(
     if (useMockFallback) {
       console.warn("Translation service unavailable, using mock fallback:",
         error instanceof Error ? error.message : error);
-      return generateMockTranslations(payload);
+      const mockData = generateMockTranslations(payload);
+      debug.response = mockData;
+      return { success: true, data: mockData, debug };
     }
 
-    if (error instanceof TranslationServiceError) {
-      throw error;
-    }
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new TranslationServiceError(
-        "Translation service request timed out",
-        translationServiceUrl,
-        payload
-      );
-    }
-    // Wrap other errors with context
-    throw new TranslationServiceError(
-      error instanceof Error ? error.message : "Unknown error",
-      translationServiceUrl,
-      payload
-    );
+    const errorMessage = error instanceof Error && error.name === "AbortError"
+      ? "Translation service request timed out"
+      : error instanceof Error ? error.message : "Unknown error";
+
+    return {
+      success: false,
+      error: errorMessage,
+      debug,
+    };
   }
 }
 
