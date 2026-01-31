@@ -5,7 +5,7 @@
       "name": "whisperly_api",
       "dependencies": {
         "@hono/zod-validator": "^0.7.5",
-        "@sudobility/auth_lib": "^0.0.33",
+        "@sudobility/auth_lib": "^0.0.35",
         "@sudobility/auth_service": "^1.1.2",
         "@sudobility/entity_service": "^1.0.16",
         "@sudobility/ratelimit_service": "^1.0.18",
@@ -347,7 +347,7 @@
 
     "@standard-schema/spec": ["@standard-schema/spec@1.1.0", "", {}, "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="],
 
-    "@sudobility/auth_lib": ["@sudobility/auth_lib@0.0.33", "", { "peerDependencies": { "@react-native-firebase/app": ">=18.0.0", "@react-native-firebase/auth": ">=18.0.0", "@sudobility/di": "^1.5.31", "@sudobility/di_rn": "^0.1.16", "@sudobility/di_web": "^0.1.91", "@sudobility/types": "^1.9.49", "@tanstack/react-query": "^5.0.0", "firebase": "^12.7.0", "react": "^18.0.0 || ^19.0.0" }, "optionalPeers": ["@react-native-firebase/app", "@react-native-firebase/auth", "@sudobility/di_rn", "@sudobility/di_web", "firebase"] }, "sha512-UZyipIdd50i0ppRk2PBjEJ6ScZajkh7OXl2jq1e/YfGG5OvVru5MxW/M0pj3hv9UWjg8sChzIU0vEJw7+PGtuQ=="],
+    "@sudobility/auth_lib": ["@sudobility/auth_lib@0.0.35", "", { "peerDependencies": { "@react-native-firebase/app": ">=18.0.0", "@react-native-firebase/auth": ">=18.0.0", "@sudobility/di": "^1.5.31", "@sudobility/di_rn": "^0.1.18", "@sudobility/di_web": "^0.1.92", "@sudobility/types": "^1.9.49", "@tanstack/react-query": "^5.0.0", "firebase": "^12.7.0", "react": "^18.0.0 || ^19.0.0" }, "optionalPeers": ["@react-native-firebase/app", "@react-native-firebase/auth", "@sudobility/di_rn", "@sudobility/di_web", "firebase"] }, "sha512-e5Ford8ab41oNwI9XO+ciUYDeZouA49/HNeVgQ+TEb8EO1yMyd1omOkJPc34VjvCQ9rSH/mgWMUsLkINU2R3uA=="],
 
     "@sudobility/auth_service": ["@sudobility/auth_service@1.1.2", "", { "peerDependencies": { "@sudobility/types": "^1.9.49", "firebase-admin": "^13.0.0" } }, "sha512-huN4PcJR2Z8MaeNN2kZjtG9ipkRR3PHwsfcDlrAUoQ+L1uv1wOap4T9ZIFOdby0snMx+xR9g8zF8Fmtkncumxw=="],
 
