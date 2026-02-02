@@ -1,6 +1,6 @@
 {
   "name": "@sudobility/whisperly_api",
-  "version": "1.0.35",
+  "version": "1.0.36",
   "module": "src/index.ts",
   "type": "module",
   "private": true,
@@ -36,7 +36,7 @@
   },
   "dependencies": {
     "@hono/zod-validator": "^0.7.5",
-    "@sudobility/auth_lib": "^0.0.35",
+    "@sudobility/auth_lib": "^0.0.43",
     "@sudobility/auth_service": "^1.1.2",
     "@sudobility/entity_service": "^1.0.16",
     "@sudobility/ratelimit_service": "^1.0.18",
