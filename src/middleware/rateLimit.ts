@@ -123,24 +123,13 @@ export function getTestMode(c: Context): boolean {
 
 /**
  * Check if an entity is owned by a site admin.
- * Site admins' personal entities are exempt from rate limiting.
+ * Entities owned by site admins are exempt from rate limiting.
  *
- * Conditions:
- * 1. The entity must be a personal entity (entity_type === "personal")
- * 2. The owner's email is in the site admin list
+ * This applies to both personal and organization entities -
+ * if the owner is a site admin, rate limiting is bypassed.
  */
 async function isEntityOwnedBySiteAdmin(entityId: string): Promise<boolean> {
-  // Find the entity and check if it's personal
-  const entityRows = await db
-    .select({ entity_type: entities.entity_type })
-    .from(entities)
-    .where(eq(entities.id, entityId));
-
-  if (entityRows.length === 0 || entityRows[0]!.entity_type !== "personal") {
-    return false;
-  }
-
-  // Find the owner of the personal entity
+  // Find the owner of the entity
   // Note: entityMembers uses 'user_id' column for firebase_uid
   const ownerMember = await db
     .select({ user_id: entityMembers.user_id })
@@ -211,7 +200,7 @@ export async function rateLimitMiddleware(c: Context, next: Next) {
     return;
   }
 
-  // Skip rate limiting for site admin's personal entities
+  // Skip rate limiting for entities owned by site admins
   if (await isEntityOwnedBySiteAdmin(entityId)) {
     await next();
     return;
