@@ -18,6 +18,14 @@ import {
   translateStrings,
   extractDictionaryTerms,
 } from "../services/translation";
+import {
+  getProjectCache,
+  findDictionaryTerms,
+  wrapTermsWithBrackets,
+  unwrapAndTranslate,
+  isCacheEmpty,
+  type TermMatch,
+} from "../services/dictionaryCache";
 import { rateLimitMiddleware } from "../middleware/rateLimit";
 
 const translateRouter = new Hono();
@@ -165,12 +173,6 @@ translateRouter.post(
       }
     }
 
-    // Get all dictionary terms for this project
-    const dictionaryTerms = await getDictionaryTermsForProject(entity.id, project.id);
-
-    // Extract terms found in the input strings
-    const foundTerms = extractDictionaryTerms(body.strings, dictionaryTerms);
-
     // Calculate metrics
     const stringCount = body.strings.length;
     const characterCount = body.strings.reduce((acc, s) => acc + s.length, 0);
@@ -187,9 +189,45 @@ translateRouter.post(
       );
     }
 
-    // Call the translation service
+    // Dictionary-aware translation processing
+    const skipDictionaries = body.skip_dictionaries ?? false;
+    let processedStrings = body.strings;
+    const termMatchesByIndex = new Map<number, TermMatch[]>();
+    let foundTerms: string[] = [];
+
+    if (!skipDictionaries) {
+      // Load dictionary cache (lazy)
+      const cache = await getProjectCache(entity.id, project.id);
+
+      if (!isCacheEmpty(cache)) {
+        // Process each string: find terms and wrap with {{brackets}}
+        processedStrings = body.strings.map((str, idx) => {
+          const matches = findDictionaryTerms(str, cache);
+          if (matches.length > 0) {
+            termMatchesByIndex.set(idx, matches);
+            return wrapTermsWithBrackets(str, matches);
+          }
+          return str;
+        });
+
+        // Collect unique found terms for response
+        const uniqueTerms = new Set<string>();
+        for (const matches of termMatchesByIndex.values()) {
+          for (const match of matches) {
+            uniqueTerms.add(match.term);
+          }
+        }
+        foundTerms = Array.from(uniqueTerms);
+      }
+    } else {
+      // When skipping dictionaries, still extract terms for informational purposes
+      const dictionaryTerms = await getDictionaryTermsForProject(entity.id, project.id);
+      foundTerms = extractDictionaryTerms(body.strings, dictionaryTerms);
+    }
+
+    // Call the translation service with processed strings
     const translationResult = await translateStrings({
-      texts: body.strings,
+      texts: processedStrings,
       target_language_codes: targetLanguages,
     });
 
@@ -242,6 +280,21 @@ translateRouter.post(
     for (let langIdx = 0; langIdx < targetLanguages.length; langIdx++) {
       const langCode = targetLanguages[langIdx]!;
       translationsByLanguage[langCode] = translationResult.data.translations[langIdx] ?? [];
+    }
+
+    // Post-process: unwrap {{term}} and replace with dictionary translations
+    if (!skipDictionaries && termMatchesByIndex.size > 0) {
+      const cache = await getProjectCache(entity.id, project.id);
+
+      for (const [langCode, translations] of Object.entries(translationsByLanguage)) {
+        translationsByLanguage[langCode] = translations.map((text, idx) => {
+          const matches = termMatchesByIndex.get(idx);
+          if (matches && matches.length > 0) {
+            return unwrapAndTranslate(text, matches, langCode, cache);
+          }
+          return text;
+        });
+      }
     }
 
     const response: TranslationResponse = {

@@ -132,6 +132,8 @@ export const translationRequestSchema = z.object({
   strings: z.array(z.string()).min(1).max(1000),
   target_languages: z.array(z.string().min(2).max(10)).min(1).max(50),
   source_language: z.string().min(2).max(10).optional(),
+  /** Skip dictionary term matching/replacement. Set to true when translating dictionary entries. */
+  skip_dictionaries: z.boolean().optional().default(false),
 });
 
 export const dictionaryLookupQuerySchema = z.object({

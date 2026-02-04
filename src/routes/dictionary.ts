@@ -11,6 +11,7 @@ import {
 } from "../schemas";
 import { successResponse, errorResponse, type DictionaryTranslations } from "@sudobility/whisperly_types";
 import { createEntityHelpers, type InvitationHelperConfig } from "@sudobility/entity_service";
+import { invalidateProjectCache } from "../services/dictionaryCache";
 
 const dictionaryRouter = new Hono();
 
@@ -251,6 +252,9 @@ dictionaryRouter.post(
         .set({ updated_at: new Date() })
         .where(eq(dictionary.id, existingDictionaryId));
 
+      // Invalidate dictionary cache for this project
+      invalidateProjectCache(result.entity.id, projectId);
+
       const updatedTranslations = await getDictionaryTranslations(existingDictionaryId);
       return c.json(successResponse({
         dictionary_id: existingDictionaryId,
@@ -279,6 +283,9 @@ dictionaryRouter.post(
           text,
         });
     }
+
+    // Invalidate dictionary cache for this project
+    invalidateProjectCache(result.entity.id, projectId);
 
     return c.json(successResponse({
       dictionary_id: newDictionaryId,
@@ -347,6 +354,9 @@ dictionaryRouter.put(
       .set({ updated_at: new Date() })
       .where(eq(dictionary.id, dictionaryId));
 
+    // Invalidate dictionary cache for this project
+    invalidateProjectCache(result.entity.id, projectId);
+
     const updatedTranslations = await getDictionaryTranslations(dictionaryId);
 
     return c.json(successResponse({
@@ -392,6 +402,9 @@ dictionaryRouter.delete(
     if (deleted.length === 0) {
       return c.json(errorResponse("Dictionary not found"), 404);
     }
+
+    // Invalidate dictionary cache for this project
+    invalidateProjectCache(result.entity.id, projectId);
 
     return c.json(successResponse({
       dictionary_id: dictionaryId,
