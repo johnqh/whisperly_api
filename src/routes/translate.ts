@@ -27,7 +27,7 @@ import {
   serializeCache,
   type TermMatch,
 } from "../services/dictionaryCache";
-import { rateLimitMiddleware } from "../middleware/rateLimit";
+import { rateLimitMiddleware, getTestMode } from "../middleware/rateLimit";
 
 const translateRouter = new Hono();
 
@@ -153,6 +153,7 @@ translateRouter.post(
   async c => {
     const { orgPath, projectName } = c.req.valid("param");
     const body = c.req.valid("json");
+    const testMode = getTestMode(c);
 
     const result = await findProject(orgPath, projectName);
 
@@ -254,7 +255,7 @@ translateRouter.post(
           success: false,
           error: `Translation failed: ${translationResult.error ?? "Unknown error"}`,
           timestamp: new Date().toISOString(),
-          debug: translationResult.debug,
+          ...(testMode ? { debug: translationResult.debug } : {}),
         },
         500
       );
@@ -287,7 +288,9 @@ translateRouter.post(
     let dictionaryCacheDebug: ReturnType<typeof serializeCache> | undefined;
     if (!skipDictionaries && termMatchesByIndex.size > 0) {
       const cache = await getProjectCache(entity.id, project.id);
-      dictionaryCacheDebug = serializeCache(cache);
+      if (testMode) {
+        dictionaryCacheDebug = serializeCache(cache);
+      }
 
       for (const [langCode, translations] of Object.entries(translationsByLanguage)) {
         translationsByLanguage[langCode] = translations.map((text, idx) => {
@@ -298,16 +301,10 @@ translateRouter.post(
           return text;
         });
       }
-    } else if (!skipDictionaries) {
-      // Even if no matches, include cache for debugging
+    } else if (!skipDictionaries && testMode) {
+      // Include cache for debugging only in test mode
       const cache = await getProjectCache(entity.id, project.id);
       dictionaryCacheDebug = serializeCache(cache);
-    }
-
-    // Build term matches debug info
-    const termMatchesDebug: Record<number, TermMatch[]> = {};
-    for (const [idx, matches] of termMatchesByIndex) {
-      termMatchesDebug[idx] = matches;
     }
 
     const response: TranslationResponse = {
@@ -315,6 +312,20 @@ translateRouter.post(
       dictionary_terms_used: foundTerms,
       request_id: crypto.randomUUID(),
     };
+
+    if (!testMode) {
+      return c.json({
+        success: true,
+        data: response,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Build term matches debug info
+    const termMatchesDebug: Record<number, TermMatch[]> = {};
+    for (const [idx, matches] of termMatchesByIndex) {
+      termMatchesDebug[idx] = matches;
+    }
 
     return c.json({
       success: true,
