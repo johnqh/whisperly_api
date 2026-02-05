@@ -161,17 +161,6 @@ export async function translateStrings(
 }
 
 /**
- * Build the dictionary callback URL for the translation service
- */
-export function buildDictionaryCallbackUrl(
-  orgPath: string,
-  projectName: string
-): string {
-  const baseUrl = getEnv("API_BASE_URL", "http://localhost:3000");
-  return `${baseUrl}/api/v1/dictionary/${orgPath}/${projectName}`;
-}
-
-/**
  * Extract dictionary terms from strings based on project dictionary entries
  */
 export function extractDictionaryTerms(

@@ -1,40 +1,7 @@
 import { describe, expect, test, afterEach } from "vitest";
 import {
-  buildDictionaryCallbackUrl,
   extractDictionaryTerms,
 } from "../../src/services/translation";
-
-describe("buildDictionaryCallbackUrl", () => {
-  const originalEnv = process.env.API_BASE_URL;
-
-  afterEach(() => {
-    if (originalEnv !== undefined) {
-      process.env.API_BASE_URL = originalEnv;
-    } else {
-      delete process.env.API_BASE_URL;
-    }
-  });
-
-  test("builds correct URL with default base URL", () => {
-    delete process.env.API_BASE_URL;
-    const url = buildDictionaryCallbackUrl("my_org", "my-project");
-    expect(url).toBe("http://localhost:3000/api/v1/dictionary/my_org/my-project");
-  });
-
-  test("builds correct URL with custom base URL", () => {
-    process.env.API_BASE_URL = "https://api.example.com";
-    const url = buildDictionaryCallbackUrl("org123", "project-name");
-    expect(url).toBe(
-      "https://api.example.com/api/v1/dictionary/org123/project-name"
-    );
-  });
-
-  test("handles single character org path and project name", () => {
-    delete process.env.API_BASE_URL;
-    const url = buildDictionaryCallbackUrl("a", "b");
-    expect(url).toBe("http://localhost:3000/api/v1/dictionary/a/b");
-  });
-});
 
 describe("extractDictionaryTerms", () => {
   test("extracts matching terms from strings", () => {

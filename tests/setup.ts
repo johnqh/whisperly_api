@@ -11,6 +11,5 @@ process.env.FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || "test-proje
 process.env.FIREBASE_CLIENT_EMAIL = process.env.FIREBASE_CLIENT_EMAIL || "test@test.iam.gserviceaccount.com";
 process.env.FIREBASE_PRIVATE_KEY = process.env.FIREBASE_PRIVATE_KEY || "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----";
 process.env.TRANSLATION_SERVICE_URL = process.env.TRANSLATION_SERVICE_URL || "http://localhost:8080/translate";
-process.env.API_BASE_URL = process.env.API_BASE_URL || "http://localhost:3000";
 
 console.log("Test environment initialized");
