@@ -295,6 +295,30 @@ export function getCacheStats(): {
 }
 
 /**
+ * Serialize cache to plain objects for debug/API responses
+ */
+export function serializeCache(cache: ProjectDictionaryCache): {
+  text_map: Record<string, string>;
+  dictionary_map: Record<string, Record<string, string>>;
+} {
+  const text_map: Record<string, string> = {};
+  for (const [text, dictId] of cache.text_map) {
+    text_map[text] = dictId;
+  }
+
+  const dictionary_map: Record<string, Record<string, string>> = {};
+  for (const [dictId, langMap] of cache.dictionary_map) {
+    const langs: Record<string, string> = {};
+    for (const [lang, text] of langMap) {
+      langs[lang] = text;
+    }
+    dictionary_map[dictId] = langs;
+  }
+
+  return { text_map, dictionary_map };
+}
+
+/**
  * Clear all caches (for testing or memory management)
  */
 export function clearAllCaches(): void {

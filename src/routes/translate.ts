@@ -24,6 +24,7 @@ import {
   wrapTermsWithBrackets,
   unwrapAndTranslate,
   isCacheEmpty,
+  serializeCache,
   type TermMatch,
 } from "../services/dictionaryCache";
 import { rateLimitMiddleware } from "../middleware/rateLimit";
@@ -283,8 +284,10 @@ translateRouter.post(
     }
 
     // Post-process: unwrap {{term}} and replace with dictionary translations
+    let dictionaryCacheDebug: ReturnType<typeof serializeCache> | undefined;
     if (!skipDictionaries && termMatchesByIndex.size > 0) {
       const cache = await getProjectCache(entity.id, project.id);
+      dictionaryCacheDebug = serializeCache(cache);
 
       for (const [langCode, translations] of Object.entries(translationsByLanguage)) {
         translationsByLanguage[langCode] = translations.map((text, idx) => {
@@ -295,6 +298,16 @@ translateRouter.post(
           return text;
         });
       }
+    } else if (!skipDictionaries) {
+      // Even if no matches, include cache for debugging
+      const cache = await getProjectCache(entity.id, project.id);
+      dictionaryCacheDebug = serializeCache(cache);
+    }
+
+    // Build term matches debug info
+    const termMatchesDebug: Record<number, TermMatch[]> = {};
+    for (const [idx, matches] of termMatchesByIndex) {
+      termMatchesDebug[idx] = matches;
     }
 
     const response: TranslationResponse = {
@@ -307,7 +320,15 @@ translateRouter.post(
       success: true,
       data: response,
       timestamp: new Date().toISOString(),
-      debug: translationResult.debug,
+      debug: {
+        ...translationResult.debug,
+        ...(dictionaryCacheDebug ? {
+          text_map: dictionaryCacheDebug.text_map,
+          dictionary_map: dictionaryCacheDebug.dictionary_map,
+        } : {}),
+        processed_strings: processedStrings,
+        term_matches: termMatchesDebug,
+      },
     });
   }
 );
