@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq, and } from "drizzle-orm";
@@ -264,6 +265,96 @@ projectsRouter.delete(
     } catch (err) {
       console.error("Error deleting project:", err);
       const message = err instanceof Error ? err.message : "Failed to delete project";
+      return c.json(errorResponse(message), 500);
+    }
+  }
+);
+
+// POST generate/regenerate API key
+projectsRouter.post(
+  "/:projectId/api-key",
+  zValidator("param", entityProjectIdParamSchema),
+  async c => {
+    try {
+      const userId = c.get("firebaseUser").uid;
+      const { entitySlug, projectId } = c.req.valid("param");
+
+      const result = await getEntityWithPermission(entitySlug, userId, true);
+      if (result.error) {
+        return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+      }
+
+      // Check if project exists
+      const existing = await db
+        .select()
+        .from(projects)
+        .where(
+          and(eq(projects.entity_id, result.entity.id), eq(projects.id, projectId))
+        );
+
+      if (existing.length === 0) {
+        return c.json(errorResponse("Project not found"), 404);
+      }
+
+      const apiKey = `wh_${crypto.randomBytes(16).toString("hex")}`;
+
+      const rows = await db
+        .update(projects)
+        .set({
+          api_key: apiKey,
+          updated_at: new Date(),
+        })
+        .where(eq(projects.id, projectId))
+        .returning();
+
+      return c.json(successResponse(rows[0]));
+    } catch (err) {
+      console.error("Error generating API key:", err);
+      const message = err instanceof Error ? err.message : "Failed to generate API key";
+      return c.json(errorResponse(message), 500);
+    }
+  }
+);
+
+// DELETE remove API key
+projectsRouter.delete(
+  "/:projectId/api-key",
+  zValidator("param", entityProjectIdParamSchema),
+  async c => {
+    try {
+      const userId = c.get("firebaseUser").uid;
+      const { entitySlug, projectId } = c.req.valid("param");
+
+      const result = await getEntityWithPermission(entitySlug, userId, true);
+      if (result.error) {
+        return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+      }
+
+      // Check if project exists
+      const existing = await db
+        .select()
+        .from(projects)
+        .where(
+          and(eq(projects.entity_id, result.entity.id), eq(projects.id, projectId))
+        );
+
+      if (existing.length === 0) {
+        return c.json(errorResponse("Project not found"), 404);
+      }
+
+      const rows = await db
+        .update(projects)
+        .set({
+          api_key: null,
+          updated_at: new Date(),
+        })
+        .where(eq(projects.id, projectId))
+        .returning();
+
+      return c.json(successResponse(rows[0]));
+    } catch (err) {
+      console.error("Error removing API key:", err);
+      const message = err instanceof Error ? err.message : "Failed to remove API key";
       return c.json(errorResponse(message), 500);
     }
   }

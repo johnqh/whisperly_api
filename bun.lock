@@ -11,7 +11,7 @@
         "@sudobility/ratelimit_service": "^1.0.19",
         "@sudobility/subscription_service": "^1.0.2",
         "@sudobility/types": "^1.9.50",
-        "@sudobility/whisperly_types": "^1.0.19",
+        "@sudobility/whisperly_types": "^1.0.20",
         "drizzle-orm": "^0.45.0",
         "firebase-admin": "^13.6.0",
         "hono": "^4.10.7",
@@ -361,7 +361,7 @@
 
     "@sudobility/types": ["@sudobility/types@1.9.50", "", {}, "sha512-SKopIMJqgNVopcz/MNukrm936yKuBJMFcz4uUbQz9XB7cDjyuExoVeyMnvidMKtOLkmJSRdYYV4+M7eG7KN2aw=="],
 
-    "@sudobility/whisperly_types": ["@sudobility/whisperly_types@1.0.19", "", { "peerDependencies": { "@sudobility/types": "^1.9.50" } }, "sha512-1hh1ghXM4YAjLyBhbV447SapE3igtixsimPE9fJHZcBm/oth3OsRDV7k0YT/vFa4ug2Fxp8ocurEiqtwi0lW3w=="],
+    "@sudobility/whisperly_types": ["@sudobility/whisperly_types@1.0.20", "", { "peerDependencies": { "@sudobility/types": "^1.9.50" } }, "sha512-4PYH/PyqtEFNcOClZZ/V/Fy8hpG/660M6jub4hId6Phgsdl/j2UIOtngpJ+aVUZcM2CopRuUhjY8nsefYbhjaw=="],
 
     "@tanstack/query-core": ["@tanstack/query-core@5.90.19", "", {}, "sha512-GLW5sjPVIvH491VV1ufddnfldyVB+teCnpPIvweEfkpRx7CfUmUGhoh9cdcUKBh/KwVxk22aNEDxeTsvmyB/WA=="],
 

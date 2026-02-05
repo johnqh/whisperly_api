@@ -1,18 +1,14 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db, entities, projects, dictionary, dictionaryEntry, usageRecords } from "../db";
 import {
   translateParamSchema,
   translationRequestSchema,
-  dictionaryLookupParamSchema,
-  dictionaryLookupQuerySchema,
 } from "../schemas";
 import {
-  successResponse,
   errorResponse,
   type TranslationResponse,
-  type DictionaryLookupResponse,
 } from "@sudobility/whisperly_types";
 import {
   translateStrings,
@@ -162,6 +158,19 @@ translateRouter.post(
     }
 
     const { project, entity } = result;
+
+    // Validate API key (if configured on project)
+    if (project.api_key) {
+      const authHeader = c.req.header("Authorization");
+      const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+      const url = new URL(c.req.url);
+      const queryKey = url.searchParams.get("api_key");
+      const providedKey = bearerToken || queryKey;
+
+      if (!providedKey || providedKey !== project.api_key) {
+        return c.json(errorResponse("Invalid or missing API key"), 401);
+      }
+    }
 
     // Validate IP allowlist (if configured on project)
     const ipAllowlist = project.ip_allowlist as string[] | null;
@@ -341,77 +350,6 @@ translateRouter.post(
         term_matches: termMatchesDebug,
       },
     });
-  }
-);
-
-// GET dictionary lookup (callback endpoint for translation service)
-// Route: /translate/dictionary/:orgPath/:projectName
-translateRouter.get(
-  "/dictionary/:orgPath/:projectName",
-  zValidator("param", dictionaryLookupParamSchema),
-  zValidator("query", dictionaryLookupQuerySchema),
-  async c => {
-    const { orgPath, projectName } = c.req.valid("param");
-    const { term, languages } = c.req.valid("query");
-
-    const result = await findProject(orgPath, projectName);
-
-    if (result.error || !result.project || !result.entity) {
-      return c.json(errorResponse(result.error || "Not found"), 404);
-    }
-
-    const { project, entity } = result;
-
-    // Find dictionary entry by searching for the term (case-insensitive)
-    const matchingEntries = await db
-      .select({
-        dictionary_id: dictionaryEntry.dictionary_id,
-      })
-      .from(dictionaryEntry)
-      .innerJoin(dictionary, eq(dictionaryEntry.dictionary_id, dictionary.id))
-      .where(
-        and(
-          eq(dictionary.entity_id, entity.id),
-          eq(dictionary.project_id, project.id),
-          sql`LOWER(${dictionaryEntry.text}) = LOWER(${term})`
-        )
-      )
-      .limit(1);
-
-    if (matchingEntries.length === 0) {
-      return c.json(errorResponse("Dictionary term not found"), 404);
-    }
-
-    const dictionaryId = matchingEntries[0]!.dictionary_id;
-
-    // Get all entries for this dictionary
-    const allEntries = await db
-      .select({
-        id: dictionaryEntry.id,
-        dictionary_id: dictionaryEntry.dictionary_id,
-        language_code: dictionaryEntry.language_code,
-        text: dictionaryEntry.text,
-        created_at: dictionaryEntry.created_at,
-        updated_at: dictionaryEntry.updated_at,
-      })
-      .from(dictionaryEntry)
-      .where(eq(dictionaryEntry.dictionary_id, dictionaryId));
-
-    const requestedLanguages = languages.split(",").map(l => l.trim());
-
-    // Build response with ALL requested languages (null if missing)
-    const translations: Record<string, string | null> = {};
-    for (const lang of requestedLanguages) {
-      const entry = allEntries.find(e => e.language_code === lang);
-      translations[lang] = entry?.text ?? null;
-    }
-
-    const response: DictionaryLookupResponse = {
-      term,
-      translations,
-    };
-
-    return c.json(successResponse(response));
   }
 );
 

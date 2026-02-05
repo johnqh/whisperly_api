@@ -79,6 +79,7 @@ export const projects = whisperlySchema.table(
     default_source_language: varchar("default_source_language", { length: 10 }),
     default_target_languages: jsonb("default_target_languages").$type<string[]>(),
     ip_allowlist: jsonb("ip_allowlist").$type<string[]>(),
+    api_key: varchar("api_key", { length: 255 }),
     is_active: boolean("is_active").default(true),
     created_at: timestamp("created_at").defaultNow(),
     updated_at: timestamp("updated_at").defaultNow(),

@@ -48,19 +48,6 @@ export const translateParamSchema = z.object({
     .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/),
 });
 
-export const dictionaryLookupParamSchema = z.object({
-  orgPath: z
-    .string()
-    .min(1)
-    .max(255)
-    .regex(/^[a-zA-Z0-9_-]+$/),
-  projectName: z
-    .string()
-    .min(1)
-    .max(255)
-    .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/),
-});
-
 // =============================================================================
 // Project Schemas
 // =============================================================================
@@ -134,11 +121,6 @@ export const translationRequestSchema = z.object({
   source_language: z.string().min(2).max(10).optional(),
   /** Skip dictionary term matching/replacement. Set to true when translating dictionary entries. */
   skip_dictionaries: z.boolean().optional().default(false),
-});
-
-export const dictionaryLookupQuerySchema = z.object({
-  term: z.string().min(1).max(500),
-  languages: z.string().min(2), // comma-separated list
 });
 
 // =============================================================================
