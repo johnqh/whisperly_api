@@ -7,6 +7,7 @@ import { Hono } from "hono";
 import { db, entities, entityMembers, entityInvitations, users } from "../db";
 import { createEntityHelpers } from "@sudobility/entity_service";
 import type { InvitationHelperConfig } from "@sudobility/entity_service";
+import { sendInvitationEmail } from "../services/email";
 
 // Create entity helpers with whisperly schema
 const config: InvitationHelperConfig = {
@@ -310,9 +311,52 @@ entitiesRouter.post("/:entitySlug/invitations", async (c) => {
       email,
       role,
     });
+
+    // Send invite email (non-blocking)
+    sendInvitationEmail({
+      recipientEmail: email,
+      entityName: entity.displayName,
+    }).catch((err) => console.error("Failed to send invitation email:", err));
+
     return c.json({ success: true, data: invitation }, 201);
   } catch (error: any) {
     console.error("Error creating invitation:", error);
+    return c.json({ success: false, error: error.message }, 400);
+  }
+});
+
+/**
+ * PUT /entities/:entitySlug/invitations/:invitationId - Renew invitation
+ * Renews the invitation with a new 14-day expiration and resends email
+ */
+entitiesRouter.put("/:entitySlug/invitations/:invitationId", async (c) => {
+  const userId = c.get("userId");
+  const entitySlug = c.req.param("entitySlug");
+  const invitationId = c.req.param("invitationId");
+
+  try {
+    const entity = await helpers.entity.getEntityBySlug(entitySlug);
+    if (!entity) {
+      return c.json({ success: false, error: "Entity not found" }, 404);
+    }
+
+    // Check if user can manage members (admin only)
+    const canManage = await helpers.permissions.canManageMembers(entity.id, userId);
+    if (!canManage) {
+      return c.json({ success: false, error: "Insufficient permissions" }, 403);
+    }
+
+    const renewed = await helpers.invitations.renewInvitation(invitationId);
+
+    // Resend invite email (non-blocking)
+    sendInvitationEmail({
+      recipientEmail: renewed.email,
+      entityName: entity.displayName,
+    }).catch((err) => console.error("Failed to resend invitation email:", err));
+
+    return c.json({ success: true, data: renewed });
+  } catch (error: any) {
+    console.error("Error renewing invitation:", error);
     return c.json({ success: false, error: error.message }, 400);
   }
 });

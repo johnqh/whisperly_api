@@ -32,21 +32,21 @@ async function getEntityWithPermission(
   entitySlug: string,
   userId: string,
   requireEdit = false
-): Promise<{ entity: typeof entities.$inferSelect; error?: string } | { entity?: undefined; error: string }> {
+): Promise<{ entity: typeof entities.$inferSelect; error?: string; errorCode?: string } | { entity?: undefined; error: string; errorCode?: string }> {
   const entity = await helpers.entity.getEntityBySlug(entitySlug);
   if (!entity) {
-    return { error: "Entity not found" };
+    return { error: "Entity not found", errorCode: "ENTITY_NOT_FOUND" };
   }
 
   if (requireEdit) {
     const canEdit = await helpers.permissions.canCreateProjects(entity.id, userId);
     if (!canEdit) {
-      return { error: "Insufficient permissions" };
+      return { error: "Your role does not have permission to create projects", errorCode: "ROLE_CANNOT_CREATE_PROJECTS" };
     }
   } else {
     const canView = await helpers.permissions.canViewEntity(entity.id, userId);
     if (!canView) {
-      return { error: "Access denied" };
+      return { error: "Access denied", errorCode: "ACCESS_DENIED" };
     }
   }
 
@@ -64,7 +64,7 @@ projectsRouter.get(
 
       const result = await getEntityWithPermission(entitySlug, userId);
       if (result.error) {
-        return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+        return c.json({ ...errorResponse(result.error), errorCode: result.errorCode }, result.errorCode === "ENTITY_NOT_FOUND" ? 404 : 403);
       }
 
       const rows = await db
@@ -92,7 +92,7 @@ projectsRouter.get(
 
       const result = await getEntityWithPermission(entitySlug, userId);
       if (result.error) {
-        return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+        return c.json({ ...errorResponse(result.error), errorCode: result.errorCode }, result.errorCode === "ENTITY_NOT_FOUND" ? 404 : 403);
       }
 
       const rows = await db
@@ -128,7 +128,7 @@ projectsRouter.post(
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
       if (result.error) {
-        return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+        return c.json({ ...errorResponse(result.error), errorCode: result.errorCode }, result.errorCode === "ENTITY_NOT_FOUND" ? 404 : 403);
       }
 
       // Check for duplicate project name within entity
@@ -182,7 +182,7 @@ projectsRouter.put(
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
       if (result.error) {
-        return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+        return c.json({ ...errorResponse(result.error), errorCode: result.errorCode }, result.errorCode === "ENTITY_NOT_FOUND" ? 404 : 403);
       }
 
       // Check if project exists
@@ -249,7 +249,7 @@ projectsRouter.delete(
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
       if (result.error) {
-        return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+        return c.json({ ...errorResponse(result.error), errorCode: result.errorCode }, result.errorCode === "ENTITY_NOT_FOUND" ? 404 : 403);
       }
 
       const rows = await db
@@ -281,7 +281,7 @@ projectsRouter.post(
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
       if (result.error) {
-        return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+        return c.json({ ...errorResponse(result.error), errorCode: result.errorCode }, result.errorCode === "ENTITY_NOT_FOUND" ? 404 : 403);
       }
 
       // Check if project exists
@@ -327,7 +327,7 @@ projectsRouter.delete(
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
       if (result.error) {
-        return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+        return c.json({ ...errorResponse(result.error), errorCode: result.errorCode }, result.errorCode === "ENTITY_NOT_FOUND" ? 404 : 403);
       }
 
       // Check if project exists

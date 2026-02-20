@@ -1,6 +1,6 @@
 {
   "name": "@sudobility/whisperly_api",
-  "version": "1.0.46",
+  "version": "1.0.47",
   "module": "src/index.ts",
   "type": "module",
   "private": true,
@@ -37,9 +37,9 @@
   },
   "dependencies": {
     "@hono/zod-validator": "^0.7.5",
-    "@sudobility/auth_lib": "^0.0.44",
+    "@sudobility/auth_lib": "^0.0.46",
     "@sudobility/auth_service": "^1.1.4",
-    "@sudobility/entity_service": "^1.0.19",
+    "@sudobility/entity_service": "^1.0.20",
     "@sudobility/ratelimit_service": "^1.0.20",
     "@sudobility/subscription_service": "^1.0.3",
     "@sudobility/types": "^1.9.50",
@@ -48,6 +48,7 @@
     "firebase-admin": "^13.6.0",
     "hono": "^4.10.7",
     "postgres": "^3.4.7",
+    "resend": "^6.9.2",
     "zod": "^3.24.0"
   }
 }
