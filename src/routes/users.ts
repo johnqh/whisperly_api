@@ -18,7 +18,7 @@ const usersRouter = new Hono();
  * Note: This route is under adminRoutes which applies firebaseAuthMiddleware,
  * so c.get("userId") is already available.
  */
-usersRouter.get("/:userId", async (c) => {
+usersRouter.get("/:userId", async c => {
   const requestedUserId = c.req.param("userId");
   const tokenUserId = c.get("userId");
 

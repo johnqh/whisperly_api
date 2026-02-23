@@ -9,11 +9,15 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq, and } from "drizzle-orm";
-import { db, entities, projects, dictionary, dictionaryEntry, usageRecords } from "../db";
 import {
-  translateParamSchema,
-  translationRequestSchema,
-} from "../schemas";
+  db,
+  entities,
+  projects,
+  dictionary,
+  dictionaryEntry,
+  usageRecords,
+} from "../db";
+import { translateParamSchema, translationRequestSchema } from "../schemas";
 import {
   errorResponse,
   type TranslationResponse,
@@ -58,7 +62,10 @@ function getClientIp(c: any): string | null {
 /**
  * Check if IP is in the allowlist
  */
-function isIpAllowed(clientIp: string | null, allowlist: string[] | null): boolean {
+function isIpAllowed(
+  clientIp: string | null,
+  allowlist: string[] | null
+): boolean {
   // If no allowlist is set, allow all
   if (!allowlist || allowlist.length === 0) {
     return true;
@@ -122,7 +129,11 @@ async function findProject(orgPath: string, projectName: string) {
     );
 
   if (projectRows.length === 0) {
-    return { error: "Project not found or inactive", project: null, entity: null };
+    return {
+      error: "Project not found or inactive",
+      project: null,
+      entity: null,
+    };
   }
 
   return { project: projectRows[0]!, entity, error: null };
@@ -131,7 +142,10 @@ async function findProject(orgPath: string, projectName: string) {
 /**
  * Get all unique dictionary terms (texts) for a project
  */
-async function getDictionaryTermsForProject(entityId: string, projectId: string): Promise<string[]> {
+async function getDictionaryTermsForProject(
+  entityId: string,
+  projectId: string
+): Promise<string[]> {
   const entries = await db
     .select({ text: dictionaryEntry.text })
     .from(dictionaryEntry)
@@ -170,7 +184,9 @@ translateRouter.post(
     // Validate API key (if configured on project)
     if (project.api_key) {
       const authHeader = c.req.header("Authorization");
-      const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+      const bearerToken = authHeader?.startsWith("Bearer ")
+        ? authHeader.slice(7)
+        : null;
       const url = new URL(c.req.url);
       const queryKey = url.searchParams.get("api_key");
       const providedKey = bearerToken || queryKey;
@@ -186,7 +202,9 @@ translateRouter.post(
       const clientIp = getClientIp(c);
       if (!isIpAllowed(clientIp, ipAllowlist)) {
         return c.json(
-          errorResponse(`IP address ${clientIp ?? "unknown"} is not allowed to access this project`),
+          errorResponse(
+            `IP address ${clientIp ?? "unknown"} is not allowed to access this project`
+          ),
           403
         );
       }
@@ -197,13 +215,16 @@ translateRouter.post(
     const characterCount = body.strings.reduce((acc, s) => acc + s.length, 0);
 
     // Use project's default target languages if not specified in request
-    const targetLanguages = body.target_languages.length > 0
-      ? body.target_languages
-      : (project.default_target_languages as string[] | null) ?? [];
+    const targetLanguages =
+      body.target_languages.length > 0
+        ? body.target_languages
+        : ((project.default_target_languages as string[] | null) ?? []);
 
     if (targetLanguages.length === 0) {
       return c.json(
-        errorResponse("No target languages specified and no defaults configured on project"),
+        errorResponse(
+          "No target languages specified and no defaults configured on project"
+        ),
         400
       );
     }
@@ -240,7 +261,10 @@ translateRouter.post(
       }
     } else {
       // When skipping dictionaries, still extract terms for informational purposes
-      const dictionaryTerms = await getDictionaryTermsForProject(entity.id, project.id);
+      const dictionaryTerms = await getDictionaryTermsForProject(
+        entity.id,
+        project.id
+      );
       foundTerms = extractDictionaryTerms(body.strings, dictionaryTerms);
     }
 
@@ -252,20 +276,24 @@ translateRouter.post(
 
     // Handle translation service failure
     if (!translationResult.success || !translationResult.data) {
-      // Log failed usage with entity context (don't let logging failure cascade)
-      try {
-        await db.insert(usageRecords).values({
+      // Log failed usage with entity context (fire-and-forget, non-blocking)
+      void db
+        .insert(usageRecords)
+        .values({
           entity_id: entity.id,
           project_id: project.id,
           request_count: 1,
           string_count: stringCount,
           character_count: characterCount,
           success: false,
-          error_message: (translationResult.error ?? "Unknown error").slice(0, 500),
+          error_message: (translationResult.error ?? "Unknown error").slice(
+            0,
+            500
+          ),
+        })
+        .catch(logError => {
+          console.error("Failed to log usage record:", logError);
         });
-      } catch (logError) {
-        console.error("Failed to log usage record:", logError);
-      }
 
       return c.json(
         {
@@ -278,19 +306,20 @@ translateRouter.post(
       );
     }
 
-    // Log successful usage with entity context (don't let logging failure break the response)
-    try {
-      await db.insert(usageRecords).values({
+    // Log successful usage with entity context (fire-and-forget, non-blocking)
+    void db
+      .insert(usageRecords)
+      .values({
         entity_id: entity.id,
         project_id: project.id,
         request_count: 1,
         string_count: stringCount,
         character_count: characterCount,
         success: true,
+      })
+      .catch(logError => {
+        console.error("Failed to log usage record:", logError);
       });
-    } catch (logError) {
-      console.error("Failed to log usage record:", logError);
-    }
 
     // Transform string[][] to Record<string, string[]>
     // translationResult.data.translations[lang_index] = array of translations for that language
@@ -298,7 +327,8 @@ translateRouter.post(
     const translationsByLanguage: Record<string, string[]> = {};
     for (let langIdx = 0; langIdx < targetLanguages.length; langIdx++) {
       const langCode = targetLanguages[langIdx]!;
-      translationsByLanguage[langCode] = translationResult.data.translations[langIdx] ?? [];
+      translationsByLanguage[langCode] =
+        translationResult.data.translations[langIdx] ?? [];
     }
 
     // Post-process: unwrap {{term}} and replace with dictionary translations
@@ -309,7 +339,9 @@ translateRouter.post(
         dictionaryCacheDebug = serializeCache(cache);
       }
 
-      for (const [langCode, translations] of Object.entries(translationsByLanguage)) {
+      for (const [langCode, translations] of Object.entries(
+        translationsByLanguage
+      )) {
         translationsByLanguage[langCode] = translations.map((text, idx) => {
           const matches = termMatchesByIndex.get(idx);
           if (matches && matches.length > 0) {
@@ -350,10 +382,12 @@ translateRouter.post(
       timestamp: new Date().toISOString(),
       debug: {
         ...translationResult.debug,
-        ...(dictionaryCacheDebug ? {
-          text_map: dictionaryCacheDebug.text_map,
-          dictionary_map: dictionaryCacheDebug.dictionary_map,
-        } : {}),
+        ...(dictionaryCacheDebug
+          ? {
+              text_map: dictionaryCacheDebug.text_map,
+              dictionary_map: dictionaryCacheDebug.dictionary_map,
+            }
+          : {}),
         processed_strings: processedStrings,
         term_matches: termMatchesDebug,
       },

@@ -4,7 +4,11 @@
 
 import type { Context, Next } from "hono";
 import type { DecodedIdToken } from "firebase-admin/auth";
-import { verifyIdToken, isAnonymousUser, isSiteAdmin } from "../services/firebase";
+import {
+  verifyIdToken,
+  isAnonymousUser,
+  isSiteAdmin,
+} from "../services/firebase";
 import { errorResponse } from "@sudobility/whisperly_types";
 import { eq } from "drizzle-orm";
 import { db, users } from "../db";
@@ -82,7 +86,7 @@ export async function firebaseAuthMiddleware(c: Context, next: Next) {
 
     // Ensure user exists in database (for profile data)
     // Run in background - don't block the request
-    ensureUserExists(decodedToken.uid, decodedToken.email).catch((err) =>
+    ensureUserExists(decodedToken.uid, decodedToken.email).catch(err =>
       console.error("Failed to ensure user exists:", err)
     );
 

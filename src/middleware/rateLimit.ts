@@ -17,18 +17,16 @@ import { SubscriptionHelper } from "@sudobility/subscription_service";
 import { db, rateLimitCounters, entities, entityMembers, users } from "../db";
 import { errorResponse } from "@sudobility/whisperly_types";
 import { getEnv, getRequiredEnv } from "../lib/env-helper";
-import { rateLimitsConfig } from "../config/rateLimits";
+import { rateLimitsConfig, TIER_DISPLAY_NAMES } from "../config/rateLimits";
 import { isSiteAdmin } from "../services/firebase";
 
 // Re-export for backward compatibility
 export { rateLimitsConfig };
 
-export const entitlementDisplayNames: Record<string, string> = {
-  none: "Free",
-  whisperly: "Whisperly",
-  pro: "Pro",
-  enterprise: "Enterprise",
-};
+/**
+ * @deprecated Import from `../config/rateLimits` instead.
+ */
+export const entitlementDisplayNames = TIER_DISPLAY_NAMES;
 
 // Lazy-initialized instances to avoid requiring env vars at module load time
 let _subscriptionHelper: SubscriptionHelper | null = null;
@@ -91,7 +89,9 @@ export function getRateLimitRouteHandler(): RateLimitRouteHandler {
  * Lazily initialized to avoid requiring REVENUECAT_API_KEY at module load time.
  * Uses single API key - testMode is extracted from URL query parameter to filter sandbox purchases.
  */
-function getRateLimitMiddleware(): ReturnType<typeof createRateLimitMiddleware> {
+function getRateLimitMiddleware(): ReturnType<
+  typeof createRateLimitMiddleware
+> {
   if (!_rateLimitMiddleware) {
     _rateLimitMiddleware = createRateLimitMiddleware({
       revenueCatApiKey: getRequiredEnv("REVENUECAT_API_KEY"),

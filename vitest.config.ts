@@ -19,6 +19,10 @@ export default defineConfig({
         "./tests/__mocks__/auth_service.ts",
         import.meta.url
       ).pathname,
+      "@sudobility/entity_service": new URL(
+        "./tests/__mocks__/entity_service.ts",
+        import.meta.url
+      ).pathname,
     },
   },
 });

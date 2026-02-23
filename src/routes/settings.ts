@@ -110,7 +110,8 @@ settingsRouter.put("/", zValidator("json", settingsUpdateSchema), async c => {
 
     if (
       duplicate.length > 0 &&
-      (existing.length === 0 || duplicate[0]!.firebase_uid !== user.firebase_uid)
+      (existing.length === 0 ||
+        duplicate[0]!.firebase_uid !== user.firebase_uid)
     ) {
       return c.json(errorResponse("Organization path already taken"), 409);
     }
@@ -118,7 +119,8 @@ settingsRouter.put("/", zValidator("json", settingsUpdateSchema), async c => {
 
   if (existing.length === 0) {
     // Create new settings
-    const orgPath = body.organization_path || generateDefaultOrgPath(user.firebase_uid);
+    const orgPath =
+      body.organization_path || generateDefaultOrgPath(user.firebase_uid);
 
     // Double-check the auto-generated path isn't taken
     if (!body.organization_path) {

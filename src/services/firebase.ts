@@ -13,7 +13,8 @@ import { getRequiredEnv, getEnv } from "../lib/env-helper";
 
 // Initialize auth_service once at module load
 // Skip in test mode to avoid requiring Firebase credentials
-const isTestMode = getEnv("NODE_ENV") === "test" || getEnv("BUN_ENV") === "test";
+const isTestMode =
+  getEnv("NODE_ENV") === "test" || getEnv("BUN_ENV") === "test";
 
 if (!isTestMode) {
   initializeAuth({

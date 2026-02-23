@@ -14,3 +14,14 @@ export const rateLimitsConfig: RateLimitsConfig = {
   pro: { hourly: 500, daily: 5000, monthly: 50000 },
   enterprise: { hourly: undefined, daily: undefined, monthly: undefined },
 };
+
+/**
+ * Human-readable display names for each entitlement tier.
+ * Used in rate limit config endpoints and the rate limit middleware.
+ */
+export const TIER_DISPLAY_NAMES: Record<string, string> = {
+  none: "Free",
+  whisperly: "Whisperly",
+  pro: "Pro",
+  enterprise: "Enterprise",
+};

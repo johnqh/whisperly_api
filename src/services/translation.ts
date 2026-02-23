@@ -58,7 +58,9 @@ export async function translateStrings(
 
   // If no URL configured, use mock in development
   if (!translationServiceUrl) {
-    console.warn("TRANSLATION_SERVICE_URL not configured, using mock translations");
+    console.warn(
+      "TRANSLATION_SERVICE_URL not configured, using mock translations"
+    );
     const mockData = generateMockTranslations(payload);
     debug.response = mockData;
     return { success: true, data: mockData, debug };
@@ -141,16 +143,21 @@ export async function translateStrings(
 
     // If mock fallback is enabled, return mock translations instead of failing
     if (useMockFallback) {
-      console.warn("Translation service unavailable, using mock fallback:",
-        error instanceof Error ? error.message : error);
+      console.warn(
+        "Translation service unavailable, using mock fallback:",
+        error instanceof Error ? error.message : error
+      );
       const mockData = generateMockTranslations(payload);
       debug.response = mockData;
       return { success: true, data: mockData, debug };
     }
 
-    const errorMessage = error instanceof Error && error.name === "AbortError"
-      ? "Translation service request timed out"
-      : error instanceof Error ? error.message : "Unknown error";
+    const errorMessage =
+      error instanceof Error && error.name === "AbortError"
+        ? "Translation service request timed out"
+        : error instanceof Error
+          ? error.message
+          : "Unknown error";
 
     return {
       success: false,

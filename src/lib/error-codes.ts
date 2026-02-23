@@ -1,0 +1,68 @@
+/**
+ * @fileoverview Centralized error codes for the Whisperly API
+ * @description Provides a consistent set of error codes used across all routes.
+ * These codes are included in error responses for client-side i18n and
+ * programmatic error handling.
+ */
+
+/**
+ * Standard error codes for the Whisperly API.
+ * Used in error responses as the `errorCode` field.
+ */
+export const ErrorCode = {
+  // Authentication & Authorization
+  AUTH_REQUIRED: "AUTH_REQUIRED",
+  INVALID_TOKEN: "INVALID_TOKEN",
+  ACCESS_DENIED: "ACCESS_DENIED",
+  ANONYMOUS_NOT_ALLOWED: "ANONYMOUS_NOT_ALLOWED",
+
+  // Entity errors
+  ENTITY_NOT_FOUND: "ENTITY_NOT_FOUND",
+  ENTITY_SLUG_REQUIRED: "ENTITY_SLUG_REQUIRED",
+  INSUFFICIENT_PERMISSIONS: "INSUFFICIENT_PERMISSIONS",
+  ROLE_CANNOT_CREATE_PROJECTS: "ROLE_CANNOT_CREATE_PROJECTS",
+  ROLE_CANNOT_MANAGE_MEMBERS: "ROLE_CANNOT_MANAGE_MEMBERS",
+  ROLE_CANNOT_INVITE_MEMBERS: "ROLE_CANNOT_INVITE_MEMBERS",
+  ROLE_CANNOT_EDIT_ENTITY: "ROLE_CANNOT_EDIT_ENTITY",
+  ROLE_CANNOT_DELETE_ENTITY: "ROLE_CANNOT_DELETE_ENTITY",
+
+  // Project errors
+  PROJECT_NOT_FOUND: "PROJECT_NOT_FOUND",
+  PROJECT_NAME_EXISTS: "PROJECT_NAME_EXISTS",
+
+  // Dictionary errors
+  DICTIONARY_NOT_FOUND: "DICTIONARY_NOT_FOUND",
+  DICTIONARY_ENTRY_NOT_FOUND: "DICTIONARY_ENTRY_NOT_FOUND",
+
+  // Translation errors
+  TRANSLATION_FAILED: "TRANSLATION_FAILED",
+  INVALID_API_KEY: "INVALID_API_KEY",
+  IP_NOT_ALLOWED: "IP_NOT_ALLOWED",
+  NO_TARGET_LANGUAGES: "NO_TARGET_LANGUAGES",
+  ORG_NOT_FOUND: "ORG_NOT_FOUND",
+
+  // Rate limit errors
+  RATE_LIMIT_EXCEEDED: "RATE_LIMIT_EXCEEDED",
+  INVALID_PERIOD_TYPE: "INVALID_PERIOD_TYPE",
+
+  // User errors
+  USER_NOT_FOUND: "USER_NOT_FOUND",
+  SELF_ONLY: "SELF_ONLY",
+
+  // Settings errors
+  ORG_PATH_TAKEN: "ORG_PATH_TAKEN",
+
+  // Invitation errors
+  INVITATION_EMAIL_ROLE_REQUIRED: "INVITATION_EMAIL_ROLE_REQUIRED",
+  ROLE_REQUIRED: "ROLE_REQUIRED",
+  DISPLAY_NAME_REQUIRED: "DISPLAY_NAME_REQUIRED",
+
+  // Validation
+  INVALID_INPUT: "INVALID_INPUT",
+  INVALID_PATH_PARAMS: "INVALID_PATH_PARAMS",
+
+  // Server errors
+  INTERNAL_ERROR: "INTERNAL_ERROR",
+} as const;
+
+export type ErrorCodeType = (typeof ErrorCode)[keyof typeof ErrorCode];

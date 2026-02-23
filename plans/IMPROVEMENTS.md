@@ -2,64 +2,74 @@
 
 ## Priority 1: Code Quality & Maintainability
 
-### 1.1 Extract shared `getEntityWithPermission` helper
+### 1.1 Extract shared `getEntityWithPermission` helper ✅
 **Files**: `src/routes/dictionary.ts`, `src/routes/project-languages.ts`, `src/routes/projects.ts`, `src/routes/analytics.ts`
 **Issue**: The `getEntityWithPermission` helper function is duplicated across 3 route files with slight variations (e.g., `projects.ts` includes `errorCode`). Similarly, `verifyProjectOwnership` is duplicated in `dictionary.ts` and `project-languages.ts`.
 **Suggestion**: Extract into a shared `src/lib/entity-helpers.ts` module with a unified signature that supports optional `errorCode` fields. This reduces maintenance burden and ensures consistent error handling.
+**Resolution**: Created `src/lib/entity-helpers.ts` with unified `getEntityWithPermission()`, `getEntityErrorStatus()`, and `verifyProjectOwnership()`. All route files now import from the shared module.
 
-### 1.2 Consolidate entity helpers config
+### 1.2 Consolidate entity helpers config ✅
 **Files**: All route files in `src/routes/`
 **Issue**: Every route file independently creates `createEntityHelpers(config)` with the same config object. While these are module-level singletons, the config construction is repeated.
 **Suggestion**: Create a shared `src/lib/entity-config.ts` that exports a pre-configured `helpers` singleton. Routes would import directly instead of constructing their own.
+**Resolution**: Created `src/lib/entity-config.ts` exporting `entityHelpers` singleton. All route files (dictionary, project-languages, projects, analytics, entities, invitations, ratelimits) now import from the shared config.
 
-### 1.3 Add `verify` script
+### 1.3 Add `verify` script ✅
 **Issue**: No single command to run all checks (typecheck + lint + test).
 **Suggestion**: Add `"verify": "bun run typecheck && bun run lint && bun run test:run"` to package.json scripts.
+**Resolution**: Added `"verify"` script to package.json.
 
 ## Priority 2: Error Handling & Consistency
 
-### 2.1 Standardize error response format
+### 2.1 Standardize error response format ✅
 **Files**: `src/routes/entities.ts`, `src/routes/invitations.ts` vs other routes
 **Issue**: Entity and invitation routes return `{ success: false, error: message }` directly, while other routes use `errorResponse()` from `@sudobility/whisperly_types`. This creates an inconsistent API surface.
 **Suggestion**: Migrate entity and invitation routes to use `errorResponse()` consistently. Add `errorCode` fields where appropriate for client-side i18n.
+**Resolution**: Migrated `entities.ts` and `invitations.ts` to use `errorResponse()` and `successResponse()` from `@sudobility/whisperly_types`. Added `errorCode` fields to all error responses.
 
-### 2.2 Add structured error codes to all routes
+### 2.2 Add structured error codes to all routes ✅
 **Files**: All routes
 **Issue**: Only `projects.ts` consistently includes `errorCode` fields. Other routes return plain error messages, making client-side error handling inconsistent.
 **Suggestion**: Define a centralized error code enum in `src/lib/error-codes.ts` and use it across all routes.
+**Resolution**: Created `src/lib/error-codes.ts` with `ErrorCode` constant object covering all error scenarios. All route files now include `errorCode` in error responses.
 
-### 2.3 Improve global error handler
+### 2.3 Improve global error handler ✅
 **File**: `src/index.ts`
 **Issue**: The global error handler exposes full stack traces in development. Consider structured logging and consistent error formatting.
 **Suggestion**: Add structured error logging (JSON format) for production. Consider adding request ID tracking for debugging.
+**Resolution**: Updated global error handler to use structured JSON logging with timestamp, path, method, and conditional stack trace. Added `errorCode: ErrorCode.INTERNAL_ERROR` to all unhandled error responses.
 
 ## Priority 3: Database & Performance
 
-### 3.1 Dictionary entry batch operations
+### 3.1 Dictionary entry batch operations ✅
 **File**: `src/routes/dictionary.ts`
 **Issue**: Dictionary create/update operations insert entries one-by-one in a loop (`for...of` with individual `await db.insert()`). This is N+1 queries.
 **Suggestion**: Use batch insert with `db.insert(dictionaryEntry).values([...entries])` and conflict handling.
+**Resolution**: Replaced the sequential `for...of` loop for new dictionary entry creation with a single batch `db.insert(dictionaryEntry).values(entryValues)` call. Note: upsert operations (onConflictDoUpdate) remain sequential as Drizzle ORM batch upserts require different handling.
 
 ### 3.2 Add database connection pooling configuration
 **File**: `src/db/index.ts`
 **Issue**: The PostgreSQL connection uses default pooling settings. No explicit configuration for max connections, idle timeout, or connection reuse.
 **Suggestion**: Add explicit pool configuration via `postgres()` options (e.g., `max`, `idle_timeout`, `connect_timeout`).
 
-### 3.3 Dictionary cache TTL
+### 3.3 Dictionary cache TTL ✅
 **File**: `src/services/dictionaryCache.ts`
 **Issue**: Dictionary cache is only invalidated by explicit mutations. If dictionary entries are modified directly in the database (e.g., via Drizzle Studio or migrations), the cache becomes stale.
 **Suggestion**: Add a configurable TTL (e.g., 5 minutes) to force cache refresh periodically, in addition to mutation-based invalidation.
+**Resolution**: Added TTL-based cache expiration (default 5 minutes, configurable via `DICTIONARY_CACHE_TTL_MS` env var). Cache entries are now refreshed when they exceed the TTL, in addition to mutation-based invalidation.
 
-### 3.4 Non-blocking usage logging
+### 3.4 Non-blocking usage logging ✅
 **File**: `src/routes/translate.ts`
 **Issue**: Usage record insertion (`await db.insert(usageRecords)`) blocks the translation response. While wrapped in try/catch, it still adds latency.
 **Suggestion**: Use `void db.insert(usageRecords).values(...).catch(...)` pattern (fire-and-forget) to avoid blocking the response. Alternatively, batch usage records and flush periodically.
+**Resolution**: Changed both success and failure usage logging in `translate.ts` to use fire-and-forget pattern: `void db.insert(...).catch(...)`. Translation responses are no longer blocked by database writes.
 
 ## Priority 4: Security
 
-### 4.1 Add request body size limits
+### 4.1 Add request body size limits ✅
 **Issue**: No explicit request body size limit configured on the Hono app.
 **Suggestion**: Add Hono body limit middleware to prevent oversized payloads, especially on the translation endpoint.
+**Resolution**: Added `bodyLimit` middleware from `hono/body-limit` with a 2MB limit for all routes. Returns 413 status with structured error response when exceeded.
 
 ### 4.2 Rate limit the translation endpoint more granularly
 **File**: `src/routes/translate.ts`
@@ -77,10 +87,11 @@
 **Issue**: Test directory structure suggests existing tests but coverage of route handlers may be incomplete, especially for edge cases (permission boundaries, duplicate names, rate limit bypasses).
 **Suggestion**: Add integration tests for critical flows: translation pipeline end-to-end, dictionary upsert behavior, entity permission boundaries, and rate limit enforcement.
 
-### 5.2 Add test for dictionary cache behavior
+### 5.2 Add test for dictionary cache behavior ✅
 **File**: `src/services/dictionaryCache.ts`
 **Issue**: The dictionary cache has complex matching logic (longest match first, word boundary, case-insensitive) that benefits from comprehensive unit testing.
 **Suggestion**: Add test cases for overlapping terms, multi-language detection, Unicode word boundaries, and cache invalidation race conditions.
+**Resolution**: Created `tests/services/dictionaryCache.test.ts` with 23 test cases covering: single/multiple term matching, case-insensitive matching, whole-word matching, longest-match-first priority, overlapping term handling, multi-language detection, bracket wrapping, unwrap-and-translate with target language fallback, regex special character handling, empty cache handling, cache serialization, and cache stats/clearing. Also added `@sudobility/entity_service` mock to `tests/__mocks__/entity_service.ts` and updated `vitest.config.ts` aliases.
 
 ## Priority 6: Observability
 
@@ -88,18 +99,21 @@
 **Issue**: Current logging uses `console.log` / `console.error` throughout. No structured format, request correlation, or log levels.
 **Suggestion**: Consider a lightweight structured logger (e.g., `pino`) with request ID correlation and configurable log levels.
 
-### 6.2 Add health check detail
+### 6.2 Add health check detail ✅
 **File**: `src/index.ts`
 **Issue**: Health check returns static JSON. It doesn't verify database connectivity or service dependencies.
 **Suggestion**: Add a `/health/detailed` endpoint that checks database connectivity and optionally translation service availability.
+**Resolution**: Added `GET /health/detailed` endpoint that checks database connectivity (with latency measurement), translation service configuration, email service configuration, and rate limiting configuration. Returns overall status as "healthy" or "degraded" based on database availability, plus uptime.
 
 ## Priority 7: Code Organization
 
-### 7.1 Remove dead setup.ts duplication
+### 7.1 Remove dead setup.ts duplication ✅
 **Files**: `src/db/index.ts` vs `src/db/setup.ts`
 **Issue**: Database initialization logic exists in both files. `setup.ts` is a standalone script that duplicates much of `initDatabase()` in `index.ts`.
 **Suggestion**: Refactor `setup.ts` to import and call `initDatabase()` instead of duplicating the SQL. This ensures schema changes only need to be made once.
+**Resolution**: Replaced the duplicated SQL in `setup.ts` with a simple call to `initDatabase()` and `closeDatabase()`. Schema changes now only need to be made in one place.
 
-### 7.2 Move configuration constants
+### 7.2 Move configuration constants ✅
 **Issue**: Rate limit tier display names are defined in both `src/middleware/rateLimit.ts` (`entitlementDisplayNames`) and `src/routes/ratelimits.ts` (`TIER_DISPLAY_NAMES`).
 **Suggestion**: Consolidate into `src/config/rateLimits.ts` alongside the rate limits config.
+**Resolution**: Added `TIER_DISPLAY_NAMES` to `src/config/rateLimits.ts`. Updated `ratelimits.ts` to import from config. Marked the old `entitlementDisplayNames` export in `rateLimit.ts` as deprecated (kept for backward compatibility, now aliases the config value).

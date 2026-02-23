@@ -6,105 +6,48 @@
 
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { eq, and } from "drizzle-orm";
-import {
-  db,
-  entities,
-  entityMembers,
-  projects,
-  projectLanguages,
-  entityInvitations,
-  users,
-} from "../db";
+import { eq } from "drizzle-orm";
+import { db, projectLanguages } from "../db";
 import {
   entityProjectIdParamSchema,
   projectLanguagesUpdateSchema,
 } from "../schemas";
 import { successResponse, errorResponse } from "@sudobility/whisperly_types";
 import {
-  createEntityHelpers,
-  type InvitationHelperConfig,
-} from "@sudobility/entity_service";
+  getEntityWithPermission,
+  getEntityErrorStatus,
+  verifyProjectOwnership,
+} from "../lib/entity-helpers";
+import { ErrorCode } from "../lib/error-codes";
 
 const projectLanguagesRouter = new Hono();
-
-// Create entity helpers
-const config: InvitationHelperConfig = {
-  db: db as any,
-  entitiesTable: entities,
-  membersTable: entityMembers,
-  invitationsTable: entityInvitations,
-  usersTable: users,
-};
-
-const helpers = createEntityHelpers(config);
-
-/**
- * Helper to get entity by slug and verify user membership
- */
-async function getEntityWithPermission(
-  entitySlug: string,
-  userId: string,
-  requireEdit = false
-): Promise<
-  | { entity: typeof entities.$inferSelect; error?: string }
-  | { entity?: undefined; error: string }
-> {
-  const entity = await helpers.entity.getEntityBySlug(entitySlug);
-  if (!entity) {
-    return { error: "Entity not found" };
-  }
-
-  if (requireEdit) {
-    const canEdit = await helpers.permissions.canCreateProjects(
-      entity.id,
-      userId
-    );
-    if (!canEdit) {
-      return { error: "Insufficient permissions" };
-    }
-  } else {
-    const canView = await helpers.permissions.canViewEntity(entity.id, userId);
-    if (!canView) {
-      return { error: "Access denied" };
-    }
-  }
-
-  return { entity };
-}
-
-/**
- * Helper to verify project belongs to entity
- */
-async function verifyProjectOwnership(entityId: string, projectId: string) {
-  const rows = await db
-    .select()
-    .from(projects)
-    .where(and(eq(projects.entity_id, entityId), eq(projects.id, projectId)));
-
-  return rows.length > 0 ? rows[0]! : null;
-}
 
 // GET project languages
 // If no record exists, creates one with default "en" and returns it
 projectLanguagesRouter.get(
   "/",
   zValidator("param", entityProjectIdParamSchema),
-  async (c) => {
+  async c => {
     const userId = c.get("firebaseUser").uid;
     const { entitySlug, projectId } = c.req.valid("param");
 
     const result = await getEntityWithPermission(entitySlug, userId);
-    if (result.error) {
+    if (result.error !== undefined) {
       return c.json(
-        errorResponse(result.error),
-        result.error === "Entity not found" ? 404 : 403
+        { ...errorResponse(result.error), errorCode: result.errorCode },
+        getEntityErrorStatus(result.errorCode)
       );
     }
 
     const project = await verifyProjectOwnership(result.entity.id, projectId);
     if (!project) {
-      return c.json(errorResponse("Project not found"), 404);
+      return c.json(
+        {
+          ...errorResponse("Project not found"),
+          errorCode: ErrorCode.PROJECT_NOT_FOUND,
+        },
+        404
+      );
     }
 
     // Check if languages record exists
@@ -146,22 +89,28 @@ projectLanguagesRouter.post(
   "/",
   zValidator("param", entityProjectIdParamSchema),
   zValidator("json", projectLanguagesUpdateSchema),
-  async (c) => {
+  async c => {
     const userId = c.get("firebaseUser").uid;
     const { entitySlug, projectId } = c.req.valid("param");
     const { languages } = c.req.valid("json");
 
     const result = await getEntityWithPermission(entitySlug, userId, true);
-    if (result.error) {
+    if (result.error !== undefined) {
       return c.json(
-        errorResponse(result.error),
-        result.error === "Entity not found" ? 404 : 403
+        { ...errorResponse(result.error), errorCode: result.errorCode },
+        getEntityErrorStatus(result.errorCode)
       );
     }
 
     const project = await verifyProjectOwnership(result.entity.id, projectId);
     if (!project) {
-      return c.json(errorResponse("Project not found"), 404);
+      return c.json(
+        {
+          ...errorResponse("Project not found"),
+          errorCode: ErrorCode.PROJECT_NOT_FOUND,
+        },
+        404
+      );
     }
 
     // Check if record exists

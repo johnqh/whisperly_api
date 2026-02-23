@@ -5,12 +5,12 @@
       "name": "whisperly_api",
       "dependencies": {
         "@hono/zod-validator": "^0.7.5",
-        "@sudobility/auth_service": "^1.1.8",
-        "@sudobility/entity_service": "^1.0.24",
-        "@sudobility/ratelimit_service": "^1.0.25",
-        "@sudobility/subscription_service": "^1.0.6",
+        "@sudobility/auth_service": "^1.1.9",
+        "@sudobility/entity_service": "^1.0.25",
+        "@sudobility/ratelimit_service": "^1.0.26",
+        "@sudobility/subscription_service": "^1.0.7",
         "@sudobility/types": "^1.9.54",
-        "@sudobility/whisperly_types": "^1.0.24",
+        "@sudobility/whisperly_types": "^1.0.25",
         "drizzle-orm": "^0.45.0",
         "firebase-admin": "^13.6.0",
         "hono": "^4.10.7",
@@ -279,17 +279,17 @@
 
     "@standard-schema/spec": ["@standard-schema/spec@1.1.0", "", {}, "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="],
 
-    "@sudobility/auth_service": ["@sudobility/auth_service@1.1.8", "", { "peerDependencies": { "@sudobility/types": "^1.9.54", "firebase-admin": "^13.0.0" } }, "sha512-0qnOmHTNfsbMebSDzzf3D3IZdQ6NqiH0PiqXbmOgPNqexxGZHvDYHcWWjxdWP2MaGDm5s81DKdM+ry2CPvBltw=="],
+    "@sudobility/auth_service": ["@sudobility/auth_service@1.1.9", "", { "peerDependencies": { "@sudobility/types": "^1.9.54", "firebase-admin": "^13.0.0" } }, "sha512-sYGBInajjRPHzEVOnrcmCob/X64rVCuS7bVpj7MzYRqcG0LuQis8k0Pb1lrbwYJ9jDPgG8xwToCSM7Q3rMipxw=="],
 
-    "@sudobility/entity_service": ["@sudobility/entity_service@1.0.24", "", { "peerDependencies": { "@sudobility/types": "^1.9.54", "drizzle-orm": "^0.45.0", "hono": "^4.0.0" } }, "sha512-WuSjKK1GkmjeHAPEoNdCNiZq93ZY1bfdJYEyJoG51CRLEy0sT3LwPKq4Hf1Zox4M7oHFt3saS4eRVnbdZePxWw=="],
+    "@sudobility/entity_service": ["@sudobility/entity_service@1.0.25", "", { "peerDependencies": { "@sudobility/types": "^1.9.54", "drizzle-orm": "^0.45.0", "hono": "^4.0.0" } }, "sha512-wWATQPYgGxJT71/SAu3SGGRpAvbVMDtEKMLxhaJjPgeoI0t3L9rPu3QTD0vxMAMtls2AxcTHNpbK9KuGhoNFdA=="],
 
-    "@sudobility/ratelimit_service": ["@sudobility/ratelimit_service@1.0.25", "", { "peerDependencies": { "@sudobility/types": "^1.9.54", "drizzle-orm": "^0.45.0", "hono": "^4.0.0", "postgres": "^3.4.0" } }, "sha512-l1LjdHENl+8yZhDqJ+V8cOdyGO4isnuJm3M3rSWbBop5aO2fg2Wq+0nBxtUCMy+a4X1kLZdgikwjDjXymowdsg=="],
+    "@sudobility/ratelimit_service": ["@sudobility/ratelimit_service@1.0.26", "", { "peerDependencies": { "@sudobility/types": "^1.9.54", "drizzle-orm": "^0.45.0", "hono": "^4.0.0", "postgres": "^3.4.0" } }, "sha512-s8JHZ8EHEXH+hW2P6OBsRwW67QyZ9MeeHBhwl0WoWcdUnMjnQhHqWtEOl8OEP6kUgdMWxGySuQbJrz4suWHGXw=="],
 
-    "@sudobility/subscription_service": ["@sudobility/subscription_service@1.0.6", "", { "peerDependencies": { "@sudobility/types": "^1.9.54" } }, "sha512-1rjw1QimbAh1/9MmHtAf9IqD6B0KvvQfWAFrDAcxvnmmLCvQjdqfVdJeY5aZFwd/+sfWjPZg3Psizz973yPLHA=="],
+    "@sudobility/subscription_service": ["@sudobility/subscription_service@1.0.7", "", { "peerDependencies": { "@sudobility/types": "^1.9.54" } }, "sha512-u80tUOnC731DFG6w9rJRr9MQLlwuw+Lz8ZfdF1nhcER1GPUOSVxoGaALtVuHsJCMSEzDY0ZDm9kHrj7LYxUgUA=="],
 
     "@sudobility/types": ["@sudobility/types@1.9.54", "", {}, "sha512-A2Kxr639D8NqPbudeARhp1cbKlE6YBf7NKaU8Gh1XwajgV9sqTBMEB+IfFpifU/tKg1JFEj/t5qmPPK4VzdZaw=="],
 
-    "@sudobility/whisperly_types": ["@sudobility/whisperly_types@1.0.24", "", { "peerDependencies": { "@sudobility/types": "^1.9.54" } }, "sha512-cXxe0WGi9MynuVpYqFV9xkFNAUbDnLnR3mDWU/hLBUWL5JuwfdimuexWI3oVD55JT3SVaPdYYhs+pRFEvSw3LA=="],
+    "@sudobility/whisperly_types": ["@sudobility/whisperly_types@1.0.25", "", { "peerDependencies": { "@sudobility/types": "^1.9.54" } }, "sha512-uKTWOaEvnfTpZI9/IbeHFTByO/3WJghZyxe7pG2LC3iKQpkSZZTlHoqy78047NYxrl+91yufXoMLBBza0SZjNw=="],
 
     "@tootallnate/once": ["@tootallnate/once@2.0.0", "", {}, "sha512-XCuKFP5PS55gnMVu3dty8KPatLqUoy/ZYzDzAGCQ8JNFCkLXzmI7vNHCR+XpbZaMWQK/vQubr7PkYq8g470J/A=="],
 

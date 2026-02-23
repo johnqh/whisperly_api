@@ -1,23 +1,13 @@
 /**
  * @fileoverview User Invitation Routes
- * @description API routes for managing user's pending invitations
+ * @description API routes for managing user's pending invitations.
+ * Uses errorResponse() from whisperly_types for consistent error formatting.
  */
 
 import { Hono } from "hono";
-import { db, entities, entityMembers, entityInvitations, users } from "../db";
-import { createEntityHelpers } from "@sudobility/entity_service";
-import type { InvitationHelperConfig } from "@sudobility/entity_service";
-
-// Create entity helpers with whisperly schema
-const config: InvitationHelperConfig = {
-  db: db as any,
-  entitiesTable: entities,
-  membersTable: entityMembers,
-  invitationsTable: entityInvitations,
-  usersTable: users,
-};
-
-const helpers = createEntityHelpers(config);
+import { successResponse, errorResponse } from "@sudobility/whisperly_types";
+import { entityHelpers } from "../lib/entity-config";
+import { ErrorCode } from "../lib/error-codes";
 
 type Variables = {
   userId: string;
@@ -29,50 +19,60 @@ const invitationsRouter = new Hono<{ Variables: Variables }>();
 /**
  * GET /invitations - List pending invitations for the current user
  */
-invitationsRouter.get("/", async (c) => {
+invitationsRouter.get("/", async c => {
   const userEmail = c.get("userEmail");
 
   if (!userEmail) {
-    return c.json({ success: true, data: [] });
+    return c.json(successResponse([]));
   }
 
   try {
-    const invitations = await helpers.invitations.getUserPendingInvitations(userEmail);
-    return c.json({ success: true, data: invitations });
+    const invitations =
+      await entityHelpers.invitations.getUserPendingInvitations(userEmail);
+    return c.json(successResponse(invitations));
   } catch (error: any) {
     console.error("Error listing user invitations:", error);
-    return c.json({ success: false, error: error.message }, 500);
+    return c.json(
+      { ...errorResponse(error.message), errorCode: ErrorCode.INTERNAL_ERROR },
+      500
+    );
   }
 });
 
 /**
  * POST /invitations/:token/accept - Accept an invitation
  */
-invitationsRouter.post("/:token/accept", async (c) => {
+invitationsRouter.post("/:token/accept", async c => {
   const userId = c.get("userId");
   const token = c.req.param("token");
 
   try {
-    await helpers.invitations.acceptInvitation(token, userId);
-    return c.json({ success: true });
+    await entityHelpers.invitations.acceptInvitation(token, userId);
+    return c.json(successResponse(null));
   } catch (error: any) {
     console.error("Error accepting invitation:", error);
-    return c.json({ success: false, error: error.message }, 400);
+    return c.json(
+      { ...errorResponse(error.message), errorCode: ErrorCode.INVALID_INPUT },
+      400
+    );
   }
 });
 
 /**
  * POST /invitations/:token/decline - Decline an invitation
  */
-invitationsRouter.post("/:token/decline", async (c) => {
+invitationsRouter.post("/:token/decline", async c => {
   const token = c.req.param("token");
 
   try {
-    await helpers.invitations.declineInvitation(token);
-    return c.json({ success: true });
+    await entityHelpers.invitations.declineInvitation(token);
+    return c.json(successResponse(null));
   } catch (error: any) {
     console.error("Error declining invitation:", error);
-    return c.json({ success: false, error: error.message }, 400);
+    return c.json(
+      { ...errorResponse(error.message), errorCode: ErrorCode.INVALID_INPUT },
+      400
+    );
   }
 });
 

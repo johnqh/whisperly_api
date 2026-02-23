@@ -4,10 +4,14 @@
  * Provides in-memory caching of dictionary entries for efficient term matching
  * during translation. The cache is lazy-loaded per project and invalidated
  * when dictionary entries are created, updated, or deleted.
+ *
+ * Cache entries also expire after a configurable TTL (default: 5 minutes)
+ * to handle out-of-band database changes (e.g., Drizzle Studio, migrations).
  */
 
 import { db, dictionary, dictionaryEntry } from "../db";
 import { eq, and } from "drizzle-orm";
+import { getEnv } from "../lib/env-helper";
 
 // =============================================================================
 // Types
@@ -39,11 +43,23 @@ export interface TermMatch {
 // Cache Storage
 // =============================================================================
 
+/** Cache TTL in milliseconds. Default: 5 minutes. Configurable via DICTIONARY_CACHE_TTL_MS env var. */
+const CACHE_TTL_MS = parseInt(
+  getEnv("DICTIONARY_CACHE_TTL_MS", "300000") ?? "300000"
+);
+
 /** Global cache: "entityId:projectId" -> ProjectDictionaryCache */
 const projectCaches = new Map<string, ProjectDictionaryCache>();
 
 function getCacheKey(entityId: string, projectId: string): string {
   return `${entityId}:${projectId}`;
+}
+
+/**
+ * Check if a cache entry has expired based on its loaded_at timestamp.
+ */
+function isCacheExpired(cache: ProjectDictionaryCache): boolean {
+  return Date.now() - cache.loaded_at > CACHE_TTL_MS;
 }
 
 // =============================================================================
@@ -67,7 +83,10 @@ async function loadProjectCache(
     .from(dictionaryEntry)
     .innerJoin(dictionary, eq(dictionaryEntry.dictionary_id, dictionary.id))
     .where(
-      and(eq(dictionary.entity_id, entityId), eq(dictionary.project_id, projectId))
+      and(
+        eq(dictionary.entity_id, entityId),
+        eq(dictionary.project_id, projectId)
+      )
     );
 
   // Build the maps
@@ -79,7 +98,9 @@ async function loadProjectCache(
     if (!dictionary_map.has(entry.dictionary_id)) {
       dictionary_map.set(entry.dictionary_id, new Map());
     }
-    dictionary_map.get(entry.dictionary_id)!.set(entry.language_code, entry.text);
+    dictionary_map
+      .get(entry.dictionary_id)!
+      .set(entry.language_code, entry.text);
 
     // Build text_map: lowercase_text -> dictionary_id
     // All language variations are keys (to detect terms in any input language)
@@ -103,27 +124,34 @@ async function loadProjectCache(
 }
 
 /**
- * Get dictionary cache for a project (lazy loading)
+ * Get dictionary cache for a project (lazy loading with TTL expiration).
+ * Cache entries are refreshed if they exceed the configured TTL,
+ * in addition to being invalidated on dictionary mutations.
  */
 export async function getProjectCache(
   entityId: string,
   projectId: string
 ): Promise<ProjectDictionaryCache> {
   const key = getCacheKey(entityId, projectId);
+  const existing = projectCaches.get(key);
 
-  if (!projectCaches.has(key)) {
+  if (!existing || isCacheExpired(existing)) {
     const cache = await loadProjectCache(entityId, projectId);
     projectCaches.set(key, cache);
+    return cache;
   }
 
-  return projectCaches.get(key)!;
+  return existing;
 }
 
 /**
  * Invalidate dictionary cache for a project
  * Call this after CREATE, UPDATE, or DELETE operations on dictionary entries
  */
-export function invalidateProjectCache(entityId: string, projectId: string): void {
+export function invalidateProjectCache(
+  entityId: string,
+  projectId: string
+): void {
   const key = getCacheKey(entityId, projectId);
   projectCaches.delete(key);
 }
@@ -152,9 +180,7 @@ export function findDictionaryTerms(
 
   // Check if a range overlaps with any already-matched range
   const overlaps = (start: number, end: number): boolean => {
-    return usedRanges.some(
-      (range) => start < range.end && end > range.start
-    );
+    return usedRanges.some(range => start < range.end && end > range.start);
   };
 
   // Iterate through terms (longest first)

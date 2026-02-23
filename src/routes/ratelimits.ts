@@ -6,10 +6,7 @@
  */
 
 import { Hono } from "hono";
-import {
-  successResponse,
-  errorResponse,
-} from "@sudobility/whisperly_types";
+import { successResponse, errorResponse } from "@sudobility/whisperly_types";
 import {
   RateLimitPeriodType,
   type RateLimitsConfigResponse,
@@ -17,23 +14,17 @@ import {
   type RateLimitsConfigData,
   type RateLimitTier,
 } from "@sudobility/types";
-import { getRateLimitRouteHandler, rateLimitsConfig, getTestMode } from "../middleware/rateLimit";
+import {
+  getRateLimitRouteHandler,
+  rateLimitsConfig,
+  getTestMode,
+} from "../middleware/rateLimit";
 import { getEnv } from "../lib/env-helper";
-import { db, entities, entityMembers, entityInvitations, users } from "../db";
-import { createEntityHelpers, type InvitationHelperConfig } from "@sudobility/entity_service";
+import { entityHelpers } from "../lib/entity-config";
+import { ErrorCode } from "../lib/error-codes";
+import { TIER_DISPLAY_NAMES } from "../config/rateLimits";
 
 const ratelimitsRouter = new Hono();
-
-// Create entity helpers
-const config: InvitationHelperConfig = {
-  db: db as any,
-  entitiesTable: entities,
-  membersTable: entityMembers,
-  invitationsTable: entityInvitations,
-  usersTable: users,
-};
-
-const helpers = createEntityHelpers(config);
 
 /**
  * Check if RevenueCat is configured
@@ -42,16 +33,6 @@ function isRevenueCatConfigured(): boolean {
   const key = getEnv("REVENUECAT_API_KEY");
   return !!key && key.length > 0;
 }
-
-/**
- * Display names for entitlement tiers
- */
-const TIER_DISPLAY_NAMES: Record<string, string> = {
-  none: "Free",
-  whisperly: "Whisperly",
-  pro: "Pro",
-  enterprise: "Enterprise",
-};
 
 /**
  * Convert rateLimitsConfig object to array of RateLimitTier objects
@@ -75,27 +56,46 @@ function convertConfigToTiersArray(): RateLimitTier[] {
 async function getEntityIdForRateLimits(
   c: any,
   firebaseUid: string
-): Promise<{ entityId: string | null; error: string | null }> {
+): Promise<{
+  entityId: string | null;
+  error: string | null;
+  errorCode: string | null;
+}> {
   // In whisperly, rateLimitUserId is the entity slug
   const rateLimitUserId = c.req.param("rateLimitUserId");
 
   if (!rateLimitUserId) {
-    return { entityId: null, error: "rateLimitUserId is required" };
+    return {
+      entityId: null,
+      error: "rateLimitUserId is required",
+      errorCode: ErrorCode.ENTITY_SLUG_REQUIRED,
+    };
   }
 
   // Look up entity by slug (rateLimitUserId is entity slug)
-  const entity = await helpers.entity.getEntityBySlug(rateLimitUserId);
+  const entity = await entityHelpers.entity.getEntityBySlug(rateLimitUserId);
   if (!entity) {
-    return { entityId: null, error: "Entity not found" };
+    return {
+      entityId: null,
+      error: "Entity not found",
+      errorCode: ErrorCode.ENTITY_NOT_FOUND,
+    };
   }
 
   // Verify user has access to this entity
-  const canView = await helpers.permissions.canViewEntity(entity.id, firebaseUid);
+  const canView = await entityHelpers.permissions.canViewEntity(
+    entity.id,
+    firebaseUid
+  );
   if (!canView) {
-    return { entityId: null, error: "Access denied to entity" };
+    return {
+      entityId: null,
+      error: "Access denied to entity",
+      errorCode: ErrorCode.ACCESS_DENIED,
+    };
   }
 
-  return { entityId: entity.id, error: null };
+  return { entityId: entity.id, error: null, errorCode: null };
 }
 
 /**
@@ -134,15 +134,26 @@ ratelimitsRouter.get("/", async c => {
     const firebaseUser = c.get("firebaseUser");
 
     // Get entity ID for rate limit lookup
-    const { entityId, error: entityError } = await getEntityIdForRateLimits(
-      c,
-      firebaseUser.uid
-    );
+    const {
+      entityId,
+      error: entityError,
+      errorCode,
+    } = await getEntityIdForRateLimits(c, firebaseUser.uid);
 
     if (entityError || !entityId) {
-      const status = entityError === "rateLimitUserId is required" ? 400 :
-                     entityError === "Access denied to entity" ? 403 : 404;
-      return c.json(errorResponse(entityError || "Entity not found"), status);
+      const status =
+        errorCode === ErrorCode.ENTITY_SLUG_REQUIRED
+          ? 400
+          : errorCode === ErrorCode.ACCESS_DENIED
+            ? 403
+            : 404;
+      return c.json(
+        {
+          ...errorResponse(entityError || "Entity not found"),
+          errorCode: errorCode || ErrorCode.ENTITY_NOT_FOUND,
+        },
+        status
+      );
     }
 
     // Use entity ID for rate limits (subscriptions are per-entity)
@@ -154,7 +165,13 @@ ratelimitsRouter.get("/", async c => {
     return c.json(successResponse(data) as RateLimitsConfigResponse);
   } catch (error) {
     console.error("Error fetching rate limits config:", error);
-    return c.json(errorResponse("Failed to fetch rate limits"), 500);
+    return c.json(
+      {
+        ...errorResponse("Failed to fetch rate limits"),
+        errorCode: ErrorCode.INTERNAL_ERROR,
+      },
+      500
+    );
   }
 });
 
@@ -174,35 +191,51 @@ ratelimitsRouter.get("/history/:periodType", async c => {
     // Validate period type
     if (!["hour", "day", "month"].includes(periodTypeParam)) {
       return c.json(
-        errorResponse(
-          "Invalid period type. Must be one of: hour, day, month"
-        ),
+        {
+          ...errorResponse(
+            "Invalid period type. Must be one of: hour, day, month"
+          ),
+          errorCode: ErrorCode.INVALID_PERIOD_TYPE,
+        },
         400
       );
     }
 
     // If RevenueCat is not configured, return empty history
     if (!isRevenueCatConfigured()) {
-      return c.json(successResponse({
-        periodType: periodTypeParam as RateLimitPeriodType,
-        entries: [],
-        totalEntries: 0,
-      }));
+      return c.json(
+        successResponse({
+          periodType: periodTypeParam as RateLimitPeriodType,
+          entries: [],
+          totalEntries: 0,
+        })
+      );
     }
 
     const periodType = periodTypeParam as RateLimitPeriodType;
     const firebaseUser = c.get("firebaseUser");
 
     // Get entity ID for rate limit lookup
-    const { entityId, error: entityError } = await getEntityIdForRateLimits(
-      c,
-      firebaseUser.uid
-    );
+    const {
+      entityId,
+      error: entityError,
+      errorCode,
+    } = await getEntityIdForRateLimits(c, firebaseUser.uid);
 
     if (entityError || !entityId) {
-      const status = entityError === "rateLimitUserId is required" ? 400 :
-                     entityError === "Access denied to entity" ? 403 : 404;
-      return c.json(errorResponse(entityError || "Entity not found"), status);
+      const status =
+        errorCode === ErrorCode.ENTITY_SLUG_REQUIRED
+          ? 400
+          : errorCode === ErrorCode.ACCESS_DENIED
+            ? 403
+            : 404;
+      return c.json(
+        {
+          ...errorResponse(entityError || "Entity not found"),
+          errorCode: errorCode || ErrorCode.ENTITY_NOT_FOUND,
+        },
+        status
+      );
     }
 
     // Use entity ID for rate limits (subscriptions are per-entity)
@@ -216,7 +249,13 @@ ratelimitsRouter.get("/history/:periodType", async c => {
     return c.json(successResponse(data) as RateLimitHistoryResponse);
   } catch (error) {
     console.error("Error fetching rate limit history:", error);
-    return c.json(errorResponse("Failed to fetch rate limit history"), 500);
+    return c.json(
+      {
+        ...errorResponse("Failed to fetch rate limit history"),
+        errorCode: ErrorCode.INTERNAL_ERROR,
+      },
+      500
+    );
   }
 });
 

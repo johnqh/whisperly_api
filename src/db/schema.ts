@@ -63,8 +63,14 @@ export const userSettings = whisperlySchema.table("user_settings", {
 // =============================================================================
 
 export const entities = createEntitiesTable(whisperlySchema, "whisperly");
-export const entityMembers = createEntityMembersTable(whisperlySchema, "whisperly");
-export const entityInvitations = createEntityInvitationsTable(whisperlySchema, "whisperly");
+export const entityMembers = createEntityMembersTable(
+  whisperlySchema,
+  "whisperly"
+);
+export const entityInvitations = createEntityInvitationsTable(
+  whisperlySchema,
+  "whisperly"
+);
 
 // =============================================================================
 // Projects Table
@@ -83,7 +89,9 @@ export const projects = whisperlySchema.table(
     description: text("description"),
     instructions: text("instructions"),
     default_source_language: varchar("default_source_language", { length: 10 }),
-    default_target_languages: jsonb("default_target_languages").$type<string[]>(),
+    default_target_languages: jsonb("default_target_languages").$type<
+      string[]
+    >(),
     ip_allowlist: jsonb("ip_allowlist").$type<string[]>(),
     api_key: varchar("api_key", { length: 255 }),
     is_active: boolean("is_active").default(true),
@@ -92,10 +100,9 @@ export const projects = whisperlySchema.table(
   },
   table => ({
     // Entity-based unique constraint (projects are unique within an entity)
-    uniqueProjectPerEntity: uniqueIndex("whisperly_unique_project_per_entity").on(
-      table.entity_id,
-      table.project_name
-    ),
+    uniqueProjectPerEntity: uniqueIndex(
+      "whisperly_unique_project_per_entity"
+    ).on(table.entity_id, table.project_name),
     entityIdx: index("whisperly_projects_entity_idx").on(table.entity_id),
   })
 );
@@ -118,7 +125,9 @@ export const projectLanguages = whisperlySchema.table(
     updated_at: timestamp("updated_at").defaultNow(),
   },
   table => ({
-    projectIdx: index("whisperly_project_languages_project_idx").on(table.project_id),
+    projectIdx: index("whisperly_project_languages_project_idx").on(
+      table.project_id
+    ),
   })
 );
 

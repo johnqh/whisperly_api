@@ -8,7 +8,7 @@ import crypto from "node:crypto";
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq, and } from "drizzle-orm";
-import { db, entities, entityMembers, projects, entityInvitations, users } from "../db";
+import { db, projects } from "../db";
 import {
   projectCreateSchema,
   projectUpdateSchema,
@@ -16,76 +16,44 @@ import {
   entityProjectIdParamSchema,
 } from "../schemas";
 import { successResponse, errorResponse } from "@sudobility/whisperly_types";
-import { createEntityHelpers, type InvitationHelperConfig } from "@sudobility/entity_service";
+import {
+  getEntityWithPermission,
+  getEntityErrorStatus,
+} from "../lib/entity-helpers";
+import { ErrorCode } from "../lib/error-codes";
 
 const projectsRouter = new Hono();
 
-// Create entity helpers
-const config: InvitationHelperConfig = {
-  db: db as any,
-  entitiesTable: entities,
-  membersTable: entityMembers,
-  invitationsTable: entityInvitations,
-  usersTable: users,
-};
-
-const helpers = createEntityHelpers(config);
-
-/**
- * Helper to get entity by slug and verify user membership
- */
-async function getEntityWithPermission(
-  entitySlug: string,
-  userId: string,
-  requireEdit = false
-): Promise<{ entity: typeof entities.$inferSelect; error?: string; errorCode?: string } | { entity?: undefined; error: string; errorCode?: string }> {
-  const entity = await helpers.entity.getEntityBySlug(entitySlug);
-  if (!entity) {
-    return { error: "Entity not found", errorCode: "ENTITY_NOT_FOUND" };
-  }
-
-  if (requireEdit) {
-    const canEdit = await helpers.permissions.canCreateProjects(entity.id, userId);
-    if (!canEdit) {
-      return { error: "Your role does not have permission to create projects", errorCode: "ROLE_CANNOT_CREATE_PROJECTS" };
-    }
-  } else {
-    const canView = await helpers.permissions.canViewEntity(entity.id, userId);
-    if (!canView) {
-      return { error: "Access denied", errorCode: "ACCESS_DENIED" };
-    }
-  }
-
-  return { entity };
-}
-
 // GET all projects for entity
-projectsRouter.get(
-  "/",
-  zValidator("param", entitySlugParamSchema),
-  async c => {
-    try {
-      const userId = c.get("firebaseUser").uid;
-      const { entitySlug } = c.req.valid("param");
+projectsRouter.get("/", zValidator("param", entitySlugParamSchema), async c => {
+  try {
+    const userId = c.get("firebaseUser").uid;
+    const { entitySlug } = c.req.valid("param");
 
-      const result = await getEntityWithPermission(entitySlug, userId);
-      if (result.error) {
-        return c.json({ ...errorResponse(result.error), errorCode: result.errorCode }, result.errorCode === "ENTITY_NOT_FOUND" ? 404 : 403);
-      }
-
-      const rows = await db
-        .select()
-        .from(projects)
-        .where(eq(projects.entity_id, result.entity.id));
-
-      return c.json(successResponse(rows));
-    } catch (err) {
-      console.error("Error fetching projects:", err);
-      const message = err instanceof Error ? err.message : "Failed to fetch projects";
-      return c.json(errorResponse(message), 500);
+    const result = await getEntityWithPermission(entitySlug, userId);
+    if (result.error !== undefined) {
+      return c.json(
+        { ...errorResponse(result.error), errorCode: result.errorCode },
+        getEntityErrorStatus(result.errorCode)
+      );
     }
+
+    const rows = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.entity_id, result.entity.id));
+
+    return c.json(successResponse(rows));
+  } catch (err) {
+    console.error("Error fetching projects:", err);
+    const message =
+      err instanceof Error ? err.message : "Failed to fetch projects";
+    return c.json(
+      { ...errorResponse(message), errorCode: ErrorCode.INTERNAL_ERROR },
+      500
+    );
   }
-);
+});
 
 // GET single project
 projectsRouter.get(
@@ -97,26 +65,42 @@ projectsRouter.get(
       const { entitySlug, projectId } = c.req.valid("param");
 
       const result = await getEntityWithPermission(entitySlug, userId);
-      if (result.error) {
-        return c.json({ ...errorResponse(result.error), errorCode: result.errorCode }, result.errorCode === "ENTITY_NOT_FOUND" ? 404 : 403);
+      if (result.error !== undefined) {
+        return c.json(
+          { ...errorResponse(result.error), errorCode: result.errorCode },
+          getEntityErrorStatus(result.errorCode)
+        );
       }
 
       const rows = await db
         .select()
         .from(projects)
         .where(
-          and(eq(projects.entity_id, result.entity.id), eq(projects.id, projectId))
+          and(
+            eq(projects.entity_id, result.entity.id),
+            eq(projects.id, projectId)
+          )
         );
 
       if (rows.length === 0) {
-        return c.json(errorResponse("Project not found"), 404);
+        return c.json(
+          {
+            ...errorResponse("Project not found"),
+            errorCode: ErrorCode.PROJECT_NOT_FOUND,
+          },
+          404
+        );
       }
 
       return c.json(successResponse(rows[0]));
     } catch (err) {
       console.error("Error fetching project:", err);
-      const message = err instanceof Error ? err.message : "Failed to fetch project";
-      return c.json(errorResponse(message), 500);
+      const message =
+        err instanceof Error ? err.message : "Failed to fetch project";
+      return c.json(
+        { ...errorResponse(message), errorCode: ErrorCode.INTERNAL_ERROR },
+        500
+      );
     }
   }
 );
@@ -133,8 +117,11 @@ projectsRouter.post(
       const body = c.req.valid("json");
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
-      if (result.error) {
-        return c.json({ ...errorResponse(result.error), errorCode: result.errorCode }, result.errorCode === "ENTITY_NOT_FOUND" ? 404 : 403);
+      if (result.error !== undefined) {
+        return c.json(
+          { ...errorResponse(result.error), errorCode: result.errorCode },
+          getEntityErrorStatus(result.errorCode)
+        );
       }
 
       // Check for duplicate project name within entity
@@ -149,7 +136,13 @@ projectsRouter.post(
         );
 
       if (existing.length > 0) {
-        return c.json(errorResponse("Project name already exists"), 409);
+        return c.json(
+          {
+            ...errorResponse("Project name already exists"),
+            errorCode: ErrorCode.PROJECT_NAME_EXISTS,
+          },
+          409
+        );
       }
 
       const rows = await db
@@ -169,8 +162,12 @@ projectsRouter.post(
       return c.json(successResponse(rows[0]), 201);
     } catch (err) {
       console.error("Error creating project:", err);
-      const message = err instanceof Error ? err.message : "Failed to create project";
-      return c.json(errorResponse(message), 500);
+      const message =
+        err instanceof Error ? err.message : "Failed to create project";
+      return c.json(
+        { ...errorResponse(message), errorCode: ErrorCode.INTERNAL_ERROR },
+        500
+      );
     }
   }
 );
@@ -187,8 +184,11 @@ projectsRouter.put(
       const body = c.req.valid("json");
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
-      if (result.error) {
-        return c.json({ ...errorResponse(result.error), errorCode: result.errorCode }, result.errorCode === "ENTITY_NOT_FOUND" ? 404 : 403);
+      if (result.error !== undefined) {
+        return c.json(
+          { ...errorResponse(result.error), errorCode: result.errorCode },
+          getEntityErrorStatus(result.errorCode)
+        );
       }
 
       // Check if project exists
@@ -196,11 +196,20 @@ projectsRouter.put(
         .select()
         .from(projects)
         .where(
-          and(eq(projects.entity_id, result.entity.id), eq(projects.id, projectId))
+          and(
+            eq(projects.entity_id, result.entity.id),
+            eq(projects.id, projectId)
+          )
         );
 
       if (existing.length === 0) {
-        return c.json(errorResponse("Project not found"), 404);
+        return c.json(
+          {
+            ...errorResponse("Project not found"),
+            errorCode: ErrorCode.PROJECT_NOT_FOUND,
+          },
+          404
+        );
       }
 
       const current = existing[0]!;
@@ -218,7 +227,13 @@ projectsRouter.put(
           );
 
         if (duplicate.length > 0) {
-          return c.json(errorResponse("Project name already exists"), 409);
+          return c.json(
+            {
+              ...errorResponse("Project name already exists"),
+              errorCode: ErrorCode.PROJECT_NAME_EXISTS,
+            },
+            409
+          );
         }
       }
 
@@ -238,8 +253,12 @@ projectsRouter.put(
       return c.json(successResponse(rows[0]));
     } catch (err) {
       console.error("Error updating project:", err);
-      const message = err instanceof Error ? err.message : "Failed to update project";
-      return c.json(errorResponse(message), 500);
+      const message =
+        err instanceof Error ? err.message : "Failed to update project";
+      return c.json(
+        { ...errorResponse(message), errorCode: ErrorCode.INTERNAL_ERROR },
+        500
+      );
     }
   }
 );
@@ -254,24 +273,42 @@ projectsRouter.delete(
       const { entitySlug, projectId } = c.req.valid("param");
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
-      if (result.error) {
-        return c.json({ ...errorResponse(result.error), errorCode: result.errorCode }, result.errorCode === "ENTITY_NOT_FOUND" ? 404 : 403);
+      if (result.error !== undefined) {
+        return c.json(
+          { ...errorResponse(result.error), errorCode: result.errorCode },
+          getEntityErrorStatus(result.errorCode)
+        );
       }
 
       const rows = await db
         .delete(projects)
-        .where(and(eq(projects.entity_id, result.entity.id), eq(projects.id, projectId)))
+        .where(
+          and(
+            eq(projects.entity_id, result.entity.id),
+            eq(projects.id, projectId)
+          )
+        )
         .returning();
 
       if (rows.length === 0) {
-        return c.json(errorResponse("Project not found"), 404);
+        return c.json(
+          {
+            ...errorResponse("Project not found"),
+            errorCode: ErrorCode.PROJECT_NOT_FOUND,
+          },
+          404
+        );
       }
 
       return c.json(successResponse(rows[0]));
     } catch (err) {
       console.error("Error deleting project:", err);
-      const message = err instanceof Error ? err.message : "Failed to delete project";
-      return c.json(errorResponse(message), 500);
+      const message =
+        err instanceof Error ? err.message : "Failed to delete project";
+      return c.json(
+        { ...errorResponse(message), errorCode: ErrorCode.INTERNAL_ERROR },
+        500
+      );
     }
   }
 );
@@ -286,8 +323,11 @@ projectsRouter.post(
       const { entitySlug, projectId } = c.req.valid("param");
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
-      if (result.error) {
-        return c.json({ ...errorResponse(result.error), errorCode: result.errorCode }, result.errorCode === "ENTITY_NOT_FOUND" ? 404 : 403);
+      if (result.error !== undefined) {
+        return c.json(
+          { ...errorResponse(result.error), errorCode: result.errorCode },
+          getEntityErrorStatus(result.errorCode)
+        );
       }
 
       // Check if project exists
@@ -295,11 +335,20 @@ projectsRouter.post(
         .select()
         .from(projects)
         .where(
-          and(eq(projects.entity_id, result.entity.id), eq(projects.id, projectId))
+          and(
+            eq(projects.entity_id, result.entity.id),
+            eq(projects.id, projectId)
+          )
         );
 
       if (existing.length === 0) {
-        return c.json(errorResponse("Project not found"), 404);
+        return c.json(
+          {
+            ...errorResponse("Project not found"),
+            errorCode: ErrorCode.PROJECT_NOT_FOUND,
+          },
+          404
+        );
       }
 
       const apiKey = `wh_${crypto.randomBytes(16).toString("hex")}`;
@@ -316,8 +365,12 @@ projectsRouter.post(
       return c.json(successResponse(rows[0]));
     } catch (err) {
       console.error("Error generating API key:", err);
-      const message = err instanceof Error ? err.message : "Failed to generate API key";
-      return c.json(errorResponse(message), 500);
+      const message =
+        err instanceof Error ? err.message : "Failed to generate API key";
+      return c.json(
+        { ...errorResponse(message), errorCode: ErrorCode.INTERNAL_ERROR },
+        500
+      );
     }
   }
 );
@@ -332,8 +385,11 @@ projectsRouter.delete(
       const { entitySlug, projectId } = c.req.valid("param");
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
-      if (result.error) {
-        return c.json({ ...errorResponse(result.error), errorCode: result.errorCode }, result.errorCode === "ENTITY_NOT_FOUND" ? 404 : 403);
+      if (result.error !== undefined) {
+        return c.json(
+          { ...errorResponse(result.error), errorCode: result.errorCode },
+          getEntityErrorStatus(result.errorCode)
+        );
       }
 
       // Check if project exists
@@ -341,11 +397,20 @@ projectsRouter.delete(
         .select()
         .from(projects)
         .where(
-          and(eq(projects.entity_id, result.entity.id), eq(projects.id, projectId))
+          and(
+            eq(projects.entity_id, result.entity.id),
+            eq(projects.id, projectId)
+          )
         );
 
       if (existing.length === 0) {
-        return c.json(errorResponse("Project not found"), 404);
+        return c.json(
+          {
+            ...errorResponse("Project not found"),
+            errorCode: ErrorCode.PROJECT_NOT_FOUND,
+          },
+          404
+        );
       }
 
       const rows = await db
@@ -360,8 +425,12 @@ projectsRouter.delete(
       return c.json(successResponse(rows[0]));
     } catch (err) {
       console.error("Error removing API key:", err);
-      const message = err instanceof Error ? err.message : "Failed to remove API key";
-      return c.json(errorResponse(message), 500);
+      const message =
+        err instanceof Error ? err.message : "Failed to remove API key";
+      return c.json(
+        { ...errorResponse(message), errorCode: ErrorCode.INTERNAL_ERROR },
+        500
+      );
     }
   }
 );

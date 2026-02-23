@@ -7,7 +7,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
-import { db, entities, entityMembers, projects, usageRecords, entityInvitations, users } from "../db";
+import { db, projects, usageRecords } from "../db";
 import { analyticsQuerySchema, entitySlugParamSchema } from "../schemas";
 import {
   successResponse,
@@ -17,47 +17,60 @@ import {
   type UsageByProject,
   type UsageByDate,
 } from "@sudobility/whisperly_types";
-import { createEntityHelpers, type InvitationHelperConfig } from "@sudobility/entity_service";
+import { entityHelpers } from "../lib/entity-config";
+import { ErrorCode } from "../lib/error-codes";
 
 const analyticsRouter = new Hono();
 
-// Create entity helpers
-const config: InvitationHelperConfig = {
-  db: db as any,
-  entitiesTable: entities,
-  membersTable: entityMembers,
-  invitationsTable: entityInvitations,
-  usersTable: users,
-};
-
-const helpers = createEntityHelpers(config);
-
 /**
  * Verify user has access to entity and return its ID.
+ *
+ * @param c - Hono context
+ * @param firebaseUid - The user's Firebase UID
+ * @returns The entity ID on success, or an error message on failure
  */
 async function getEntityIdForAnalytics(
   c: any,
   firebaseUid: string
-): Promise<{ entityId: string | null; error: string | null }> {
+): Promise<{
+  entityId: string | null;
+  error: string | null;
+  errorCode: string | null;
+}> {
   const entitySlug = c.req.param("entitySlug");
 
   if (!entitySlug) {
-    return { entityId: null, error: "entitySlug is required" };
+    return {
+      entityId: null,
+      error: "entitySlug is required",
+      errorCode: ErrorCode.ENTITY_SLUG_REQUIRED,
+    };
   }
 
   // Look up entity by slug
-  const entity = await helpers.entity.getEntityBySlug(entitySlug);
+  const entity = await entityHelpers.entity.getEntityBySlug(entitySlug);
   if (!entity) {
-    return { entityId: null, error: "Entity not found" };
+    return {
+      entityId: null,
+      error: "Entity not found",
+      errorCode: ErrorCode.ENTITY_NOT_FOUND,
+    };
   }
 
   // Verify user has access to this entity
-  const canView = await helpers.permissions.canViewEntity(entity.id, firebaseUid);
+  const canView = await entityHelpers.permissions.canViewEntity(
+    entity.id,
+    firebaseUid
+  );
   if (!canView) {
-    return { entityId: null, error: "Access denied to entity" };
+    return {
+      entityId: null,
+      error: "Access denied to entity",
+      errorCode: ErrorCode.ACCESS_DENIED,
+    };
   }
 
-  return { entityId: entity.id, error: null };
+  return { entityId: entity.id, error: null, errorCode: null };
 }
 
 // GET analytics for entity
@@ -70,15 +83,26 @@ analyticsRouter.get(
     const query = c.req.valid("query");
 
     // Get entity ID from path parameter
-    const { entityId, error: entityError } = await getEntityIdForAnalytics(
-      c,
-      firebaseUser.uid
-    );
+    const {
+      entityId,
+      error: entityError,
+      errorCode,
+    } = await getEntityIdForAnalytics(c, firebaseUser.uid);
 
     if (entityError || !entityId) {
-      const status = entityError === "entitySlug is required" ? 400 :
-                     entityError === "Access denied to entity" ? 403 : 404;
-      return c.json(errorResponse(entityError || "Entity not found"), status);
+      const status =
+        errorCode === ErrorCode.ENTITY_SLUG_REQUIRED
+          ? 400
+          : errorCode === ErrorCode.ACCESS_DENIED
+            ? 403
+            : 404;
+      return c.json(
+        {
+          ...errorResponse(entityError || "Entity not found"),
+          errorCode: errorCode || ErrorCode.ENTITY_NOT_FOUND,
+        },
+        status
+      );
     }
 
     // Get all projects for this entity
@@ -97,7 +121,9 @@ analyticsRouter.get(
           successful_requests: 0,
           failed_requests: 0,
           success_rate: 0,
-          period_start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+          period_start: new Date(
+            Date.now() - 30 * 24 * 60 * 60 * 1000
+          ).toISOString(),
           period_end: new Date().toISOString(),
         },
         by_project: [],
@@ -107,7 +133,9 @@ analyticsRouter.get(
     }
 
     const projectIds = entityProjects.map(p => p.id);
-    const projectNameMap = new Map(entityProjects.map(p => [p.id, p.project_name]));
+    const projectNameMap = new Map(
+      entityProjects.map(p => [p.id, p.project_name])
+    );
 
     // Build date range conditions
     const startDate = query.start_date
@@ -127,7 +155,13 @@ analyticsRouter.get(
     if (query.project_id) {
       // Make sure the requested project belongs to this entity
       if (!projectIds.includes(query.project_id)) {
-        return c.json(errorResponse("Project not found in this entity"), 404);
+        return c.json(
+          {
+            ...errorResponse("Project not found in this entity"),
+            errorCode: ErrorCode.PROJECT_NOT_FOUND,
+          },
+          404
+        );
       }
       conditions.push(eq(usageRecords.project_id, query.project_id));
     }

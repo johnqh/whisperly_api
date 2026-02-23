@@ -93,10 +93,16 @@ export const projectUpdateSchema = z.object({
 // =============================================================================
 
 // Payload: { "en": "hello", "es": "hola" }
-export const dictionaryCreateSchema = z.record(z.string().min(2).max(10), z.string().min(1));
+export const dictionaryCreateSchema = z.record(
+  z.string().min(2).max(10),
+  z.string().min(1)
+);
 
 // Payload: { "en": "hi", "de": "hallo" } - partial update
-export const dictionaryUpdateSchema = z.record(z.string().min(2).max(10), z.string().min(1));
+export const dictionaryUpdateSchema = z.record(
+  z.string().min(2).max(10),
+  z.string().min(1)
+);
 
 // =============================================================================
 // Settings Schemas
