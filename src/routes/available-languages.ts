@@ -1,3 +1,8 @@
+/**
+ * @fileoverview Available languages route
+ * @description Returns the list of supported target languages from the static config file.
+ */
+
 import { Hono } from "hono";
 import { successResponse } from "@sudobility/whisperly_types";
 import languagesConfig from "../config/languages.json";

@@ -1,3 +1,9 @@
+/**
+ * @fileoverview User settings routes
+ * @description GET/PUT endpoints for user settings including legacy organization path management.
+ * Settings are per-user (not per-entity) and include auto-generated default org paths.
+ */
+
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq } from "drizzle-orm";

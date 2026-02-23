@@ -1,3 +1,10 @@
+/**
+ * @fileoverview Rate limiting middleware
+ * @description Per-entity rate limiting via RevenueCat subscription tiers.
+ * Provides lazy-initialized singletons for subscription, entitlement, and rate limit services.
+ * Site admin entities bypass rate limits. Gracefully disabled when REVENUECAT_API_KEY is unset.
+ */
+
 import type { Context, Next } from "hono";
 import { eq, and } from "drizzle-orm";
 import {

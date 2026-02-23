@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Project languages routes
+ * @description GET/POST endpoints for managing a project's selected target languages.
+ * Auto-creates a default "en" record on first GET if none exists.
+ */
+
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq, and } from "drizzle-orm";

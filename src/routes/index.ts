@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Route aggregation and mounting
+ * @description Combines all API routes under /api/v1. Public routes (translate)
+ * are mounted first, then admin routes (requiring Firebase JWT auth) are mounted.
+ */
+
 import { Hono } from "hono";
 import { firebaseAuthMiddleware } from "../middleware/firebaseAuth";
 import projectsRouter from "./projects";

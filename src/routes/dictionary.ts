@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Dictionary routes
+ * @description CRUD endpoints for managing dictionary entries (translation glossary terms)
+ * scoped to entity/project. Supports upsert on create and partial updates.
+ */
+
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq, and, sql } from "drizzle-orm";

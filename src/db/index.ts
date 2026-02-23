@@ -1,3 +1,11 @@
+/**
+ * @fileoverview Database connection and initialization
+ * @description Provides a lazy-initialized PostgreSQL connection via Drizzle ORM.
+ * The `db` export uses a Proxy to defer connection creation until first use.
+ * The `initDatabase()` function creates the whisperly schema, tables, indexes,
+ * and runs entity/rate-limit migrations.
+ */
+
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import postgres, { type Sql } from "postgres";
 import * as schema from "./schema";
@@ -9,6 +17,10 @@ import { runEntityMigration } from "@sudobility/entity_service";
 let _client: Sql | null = null;
 let _db: PostgresJsDatabase<typeof schema> | null = null;
 
+/**
+ * Get or create the PostgreSQL client connection.
+ * @returns The postgres.js client instance
+ */
 function getClient(): Sql {
   if (!_client) {
     const connectionString = getRequiredEnv("DATABASE_URL");
@@ -30,6 +42,10 @@ export const db: PostgresJsDatabase<typeof schema> = new Proxy(
   }
 );
 
+/**
+ * Initialize the database: create schema, enums, tables, indexes, and run migrations.
+ * Must be called once at application startup before serving requests.
+ */
 export async function initDatabase() {
   const client = getClient();
 
@@ -248,6 +264,10 @@ export async function initDatabase() {
   console.log("Database tables initialized");
 }
 
+/**
+ * Close the database connection and clean up resources.
+ * Safe to call multiple times.
+ */
 export async function closeDatabase() {
   if (_client) {
     await _client.end();

@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Zod validation schemas for all API routes
+ * @description Provides request validation schemas for path params, query params,
+ * and request bodies. Used with @hono/zod-validator middleware.
+ */
+
 import { z } from "zod";
 
 // =============================================================================

@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Whisperly API entry point
+ * @description Hono application setup with CORS, logging, error handling, health checks,
+ * and API route mounting. Initializes the database on startup and exports the Bun server.
+ */
+
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";

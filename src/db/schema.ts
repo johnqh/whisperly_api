@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Drizzle ORM schema definitions for the whisperly PostgreSQL schema
+ * @description Defines all database tables: users, user_settings, entities (via factory),
+ * projects, project_languages, dictionary, dictionary_entry, usage_records, and rate_limit_counters.
+ */
+
 import {
   pgSchema,
   uuid,

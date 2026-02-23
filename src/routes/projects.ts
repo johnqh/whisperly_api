@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Project routes
+ * @description CRUD endpoints for translation projects within entities.
+ * Includes API key generation/deletion and duplicate name validation.
+ */
+
 import crypto from "node:crypto";
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";

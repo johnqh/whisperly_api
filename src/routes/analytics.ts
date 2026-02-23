@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Analytics routes
+ * @description GET endpoint for entity-scoped usage analytics with date range
+ * filtering and per-project breakdown.
+ */
+
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq, and, gte, lte, sql } from "drizzle-orm";

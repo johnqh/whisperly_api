@@ -1,3 +1,10 @@
+/**
+ * @fileoverview Rate limits routes
+ * @description Endpoints for retrieving rate limit configuration, current usage,
+ * and usage history per entity. In whisperly, the rateLimitUserId path param
+ * is the entity slug (not a user ID).
+ */
+
 import { Hono } from "hono";
 import {
   successResponse,

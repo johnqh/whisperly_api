@@ -1,3 +1,11 @@
+/**
+ * @fileoverview Translation routes
+ * @description Public translation endpoint (POST /translate/:orgPath/:projectName).
+ * Handles the full translation pipeline: API key validation, IP allowlist check,
+ * dictionary term matching and wrapping, external translation service call,
+ * dictionary replacement in results, and usage logging.
+ */
+
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq, and } from "drizzle-orm";
