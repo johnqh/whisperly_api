@@ -96,12 +96,10 @@ bun run db:studio    # Open Drizzle Studio
 - **noImplicitOverride**: On
 - **Excludes**: `tests/**/*`, `scripts/**/*`
 
-## Testing
+## Testing Notes
 
-- **Framework**: Vitest (node environment)
-- **Test location**: `tests/` directory
-- **Mocking strategy**: Vitest `resolve.alias` maps `@sudobility/ratelimit_service` and `@sudobility/auth_service` to test mocks
-- **Run**: `bun run test:run`
+- Framework: Vitest (node environment), tests in `tests/` directory
+- Mocking strategy: Vitest `resolve.alias` maps `@sudobility/ratelimit_service` and `@sudobility/auth_service` to test mocks
 
 ## API Routes
 
@@ -317,6 +315,7 @@ APP_URL=                              # App URL for email links (default: http:/
 
 ## Gotchas
 
+- **Port mismatch**: The API defaults to port `3000` (`PORT` env var), but `whisperly_app` defaults `VITE_API_BASE_URL` to `http://localhost:3001`. Ensure the ports match in your environment configuration.
 - **Entity helpers duplication**: Each route file creates its own `helpers = createEntityHelpers(config)` instance with the same config. This is intentional (module-level singletons per route).
 - **`getEntityWithPermission` helper**: Duplicated across `dictionary.ts`, `project-languages.ts`, and `projects.ts` with slight variations (e.g., projects.ts includes `errorCode`).
 - **DB proxy pattern**: The `db` export uses a Proxy for lazy initialization. Calling `db` before `initDatabase()` will create the connection on first access but won't run migrations.
