@@ -3,6 +3,7 @@
  */
 
 import { Hono } from "hono";
+import { NONE_ENTITLEMENT } from "@sudobility/types";
 import { getUserInfo } from "../services/firebase";
 import { successResponse, errorResponse } from "@sudobility/whisperly_types";
 import { getSubscriptionHelper, getTestMode } from "../middleware/subscription";
@@ -65,7 +66,7 @@ usersRouter.get("/:userId/subscriptions", async (c) => {
       testMode
     );
     const subscriptionResult = {
-      hasSubscription: subscriptionInfo.entitlements.length > 0,
+      hasSubscription: subscriptionInfo.entitlements.length > 0 && !subscriptionInfo.entitlements.includes(NONE_ENTITLEMENT),
       entitlements: subscriptionInfo.entitlements,
       subscriptionStartedAt: subscriptionInfo.subscriptionStartedAt,
       platform: subscriptionInfo.platform,
