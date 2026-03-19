@@ -6,12 +6,12 @@
       "name": "whisperly_api",
       "dependencies": {
         "@hono/zod-validator": "^0.7.5",
-        "@sudobility/auth_service": "^1.1.12",
-        "@sudobility/entity_service": "^1.0.29",
-        "@sudobility/ratelimit_service": "^1.0.29",
-        "@sudobility/subscription_service": "^1.0.10",
-        "@sudobility/types": "^1.9.58",
-        "@sudobility/whisperly_types": "^1.0.28",
+        "@sudobility/auth_service": "^1.1.13",
+        "@sudobility/entity_service": "^1.0.30",
+        "@sudobility/ratelimit_service": "^1.0.30",
+        "@sudobility/subscription_service": "^1.0.13",
+        "@sudobility/types": "^1.9.59",
+        "@sudobility/whisperly_types": "^1.0.29",
         "drizzle-orm": "^0.45.0",
         "firebase-admin": "^13.6.0",
         "hono": "^4.10.7",
@@ -280,17 +280,17 @@
 
     "@standard-schema/spec": ["@standard-schema/spec@1.1.0", "", {}, "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="],
 
-    "@sudobility/auth_service": ["@sudobility/auth_service@1.1.12", "", { "peerDependencies": { "@sudobility/types": "^1.9.58", "firebase-admin": "^13.0.0" } }, "sha512-K0CJXE3c3zF9SW3IVznDMrIcsxAyPDjgT1D4vStr7OjI4iM4tHjVTtdPJrMP/R/7FcprjfoPJk7sk2DwbmHYSw=="],
+    "@sudobility/auth_service": ["@sudobility/auth_service@1.1.13", "", { "peerDependencies": { "@sudobility/types": "^1.9.59", "firebase-admin": "^13.0.0" } }, "sha512-+uIjVyW8B1Sz2ZHHRQ1bggFY7QrryPwVo+dTEZ0xzcGFlAe0440vHAbnS/NYmA+EDRi6a7YW2u7c23aXiU3G/g=="],
 
-    "@sudobility/entity_service": ["@sudobility/entity_service@1.0.29", "", { "peerDependencies": { "@sudobility/types": "^1.9.58", "drizzle-orm": "^0.45.0", "hono": "^4.0.0" } }, "sha512-QH4VY0LHNSPez16JPl8tfQ2+Xb1i88XBjGapd/Wy+DiAMiKTjC1qE1Ae+HTQjKv7oupBGDHjAIdLQg0KIHTrzQ=="],
+    "@sudobility/entity_service": ["@sudobility/entity_service@1.0.30", "", { "peerDependencies": { "@sudobility/types": "^1.9.59", "drizzle-orm": "^0.45.0", "hono": "^4.0.0" } }, "sha512-fOUjlMOH2i3Fsm83bGi1IKRmExM8xepWWRnUIiWnk/OI2ZduEj//al59cy6r2clbykuLTlMUdhePTK16jXX/Kg=="],
 
-    "@sudobility/ratelimit_service": ["@sudobility/ratelimit_service@1.0.29", "", { "peerDependencies": { "@sudobility/types": "^1.9.58", "drizzle-orm": "^0.45.0", "hono": "^4.0.0", "postgres": "^3.4.0" } }, "sha512-KQ+OoOFrpH2G1JS4jFMfMWhU+hfbOM/b3Pl8DJsOmcIkVUuIQDCwUxQRGUq+mmzdgT3DIcYwWSxi5aSrBGZtag=="],
+    "@sudobility/ratelimit_service": ["@sudobility/ratelimit_service@1.0.30", "", { "peerDependencies": { "@sudobility/types": "^1.9.59", "drizzle-orm": "^0.45.0", "hono": "^4.0.0", "postgres": "^3.4.0" } }, "sha512-VIfJV4vP0j2Zp4jcotxI4DCVtxZNSDg2q3nU4Mq31VW+SHsC78c2s+qnVbqdohn1i5cKFxftJ2vcd/noNRP6iQ=="],
 
-    "@sudobility/subscription_service": ["@sudobility/subscription_service@1.0.10", "", { "peerDependencies": { "@sudobility/types": "^1.9.58" } }, "sha512-j1xbbYBXH9nh0JIe/5i/PYp/i0L4JezXxT4PunswXSj40G2XK7t6SdyEaMN5tS48NXTov6ub6DKcDQHxuNP65g=="],
+    "@sudobility/subscription_service": ["@sudobility/subscription_service@1.0.13", "", {}, "sha512-pqOJKo80JsnTXRdKgxcdNGFbjA6trM/kU4pGN6ZBUKjKt5ajvtkpaveyXAQKVY9pfneKZADzO3wbXsqZ7f2Svw=="],
 
-    "@sudobility/types": ["@sudobility/types@1.9.58", "", {}, "sha512-GD6pS8C8loS8SnD7ynzDBCJ++Z9N0vzLTEO03nxFISffrEX67nNOrBEs8LqCU3yFn4LJowiIV7JyigNLCQUAoA=="],
+    "@sudobility/types": ["@sudobility/types@1.9.59", "", {}, "sha512-ysz2JU1wu31H26TktCkgZZD2DQqpMX5KVLMiVuFY7ndPYMjNtoYzZoiigV1juHz0HWSh3LIFbRBR73O6UTg7Aw=="],
 
-    "@sudobility/whisperly_types": ["@sudobility/whisperly_types@1.0.28", "", { "peerDependencies": { "@sudobility/types": "^1.9.58" } }, "sha512-z72Bdy+AOIwCSSLF1b7LqD9H4rkBkRfSRTWYy06GU3k4iZSedJx/qlqrMg6IcUzOab8eW/Z7lIUkB3Aj2YlHPg=="],
+    "@sudobility/whisperly_types": ["@sudobility/whisperly_types@1.0.29", "", { "peerDependencies": { "@sudobility/types": "^1.9.59" } }, "sha512-sRzjJExd3VEEcxBpP2iDO5LuHyVEKaLUVniyXgbcN6edYy3KPlezeNDx9P/iUbOSCkKSY3AhuG+Ww/+qDbJUpg=="],
 
     "@tootallnate/once": ["@tootallnate/once@2.0.0", "", {}, "sha512-XCuKFP5PS55gnMVu3dty8KPatLqUoy/ZYzDzAGCQ8JNFCkLXzmI7vNHCR+XpbZaMWQK/vQubr7PkYq8g470J/A=="],
 

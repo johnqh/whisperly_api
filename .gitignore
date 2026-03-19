@@ -46,3 +46,4 @@ Thumbs.db
 # Claude Code local settings
 .claude/settings.local.json
 .env.merged
+.env.local.copy

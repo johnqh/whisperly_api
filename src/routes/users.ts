@@ -5,6 +5,7 @@
 import { Hono } from "hono";
 import { getUserInfo } from "../services/firebase";
 import { successResponse, errorResponse } from "@sudobility/whisperly_types";
+import { getSubscriptionHelper, getTestMode } from "../middleware/subscription";
 
 const usersRouter = new Hono();
 
@@ -34,6 +35,46 @@ usersRouter.get("/:userId", async c => {
   }
 
   return c.json(successResponse(userInfo));
+});
+
+/**
+ * GET /users/:userId/subscriptions
+ *
+ * Get user subscription status (requires Firebase auth).
+ */
+usersRouter.get("/:userId/subscriptions", async (c) => {
+  const requestedUserId = c.req.param("userId");
+  const tokenUserId = c.get("userId");
+
+  if (requestedUserId !== tokenUserId) {
+    return c.json(
+      errorResponse("You can only access your own subscription"),
+      403
+    );
+  }
+
+  const subHelper = getSubscriptionHelper();
+  if (!subHelper) {
+    return c.json(errorResponse("Subscription service not configured"), 500);
+  }
+
+  try {
+    const testMode = getTestMode(c);
+    const subscriptionInfo = await subHelper.getSubscriptionInfo(
+      requestedUserId,
+      testMode
+    );
+    const subscriptionResult = {
+      hasSubscription: subscriptionInfo.entitlements.length > 0,
+      entitlements: subscriptionInfo.entitlements,
+      subscriptionStartedAt: subscriptionInfo.subscriptionStartedAt,
+      platform: subscriptionInfo.platform,
+    };
+    return c.json(successResponse(subscriptionResult));
+  } catch (error) {
+    console.error("Error fetching subscription:", error);
+    return c.json(errorResponse("Failed to fetch subscription status"), 500);
+  }
 });
 
 export default usersRouter;
