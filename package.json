@@ -1,6 +1,6 @@
 {
   "name": "@sudobility/whisperly_api",
-  "version": "1.0.58",
+  "version": "1.0.59",
   "module": "src/index.ts",
   "type": "module",
   "private": true,
@@ -41,7 +41,7 @@
     "@sudobility/auth_service": "^1.1.13",
     "@sudobility/entity_service": "^1.0.30",
     "@sudobility/ratelimit_service": "^1.0.30",
-    "@sudobility/subscription_service": "^1.0.13",
+    "@sudobility/subscription_service": "^1.0.14",
     "@sudobility/types": "^1.9.59",
     "@sudobility/whisperly_types": "^1.0.29",
     "drizzle-orm": "^0.45.0",
