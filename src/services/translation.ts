@@ -66,7 +66,7 @@ export async function translateStrings(
     return { success: true, data: mockData, debug };
   }
 
-  const timeout = parseInt(getEnv("TRANSLATION_SERVICE_TIMEOUT", "120000")!);
+  const timeout = parseInt(getEnv("TRANSLATION_SERVICE_TIMEOUT", "300000")!);
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
