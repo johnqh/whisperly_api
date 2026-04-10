@@ -96,9 +96,12 @@ export async function translateStrings(
     debug.response = responseJson;
 
     if (!response.ok) {
+      const errorDetail = typeof responseJson === 'object' && responseJson !== null
+        ? (responseJson as Record<string, unknown>).error ?? responseText
+        : responseText;
       return {
         success: false,
-        error: `Translation service error: ${response.status}`,
+        error: `Translation service error: ${response.status} - ${errorDetail}`,
         debug,
       };
     }
