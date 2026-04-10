@@ -295,10 +295,13 @@ translateRouter.post(
           console.error("Failed to log usage record:", logError);
         });
 
+      const fullError = `Translation failed: ${translationResult.error ?? "Unknown error"}`;
+      console.error(`[translate] ${fullError}`);
+
       return c.json(
         {
           success: false,
-          error: `Translation failed: ${translationResult.error ?? "Unknown error"}`,
+          error: fullError,
           timestamp: new Date().toISOString(),
           ...(testMode ? { debug: translationResult.debug } : {}),
         },
