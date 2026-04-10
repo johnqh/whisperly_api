@@ -45,6 +45,8 @@ RUN mkdir -p /app/logs && \
 # Switch to non-root user
 USER appuser
 
+EXPOSE 8021
+
 # Health check
 HEALTHCHECK --interval=30s --timeout=15s --start-period=30s --retries=3 \
   CMD curl -f http://localhost:8021/health || exit 1
