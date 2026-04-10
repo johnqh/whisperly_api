@@ -30,9 +30,10 @@ function generateMockTranslations(
   payload: TranslationServicePayload
 ): TranslationServiceResponse {
   // Return the original text with a [lang] prefix for each target language
-  const translations = payload.texts.map(text =>
-    payload.target_language_codes.map(lang => `[${lang}] ${text}`)
-  );
+  const translations: Record<string, string[]> = {};
+  for (const lang of payload.target_language_codes) {
+    translations[lang] = payload.texts.map(text => `[${lang}] ${text}`);
+  }
 
   return {
     translations,
@@ -128,10 +129,10 @@ export async function translateStrings(
       }
     }
 
-    if (!Array.isArray(translationData.translations)) {
+    if (!translationData.translations || typeof translationData.translations !== "object" || Array.isArray(translationData.translations)) {
       return {
         success: false,
-        error: `Translation service response missing 'translations' array (got ${typeof translationData.translations})`,
+        error: `Translation service response missing 'translations' map (got ${Array.isArray(translationData.translations) ? "array" : typeof translationData.translations})`,
         debug,
       };
     }

@@ -1,6 +1,6 @@
 {
   "name": "@sudobility/whisperly_api",
-  "version": "1.0.63",
+  "version": "1.0.64",
   "module": "src/index.ts",
   "type": "module",
   "private": true,
@@ -43,7 +43,7 @@
     "@sudobility/ratelimit_service": "^1.0.32",
     "@sudobility/subscription_service": "^1.0.16",
     "@sudobility/types": "^1.9.61",
-    "@sudobility/whisperly_types": "^1.0.31",
+    "@sudobility/whisperly_types": "^1.0.32",
     "drizzle-orm": "^0.45.0",
     "firebase-admin": "^13.6.0",
     "hono": "^4.10.7",

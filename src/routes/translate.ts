@@ -324,15 +324,10 @@ translateRouter.post(
         console.error("Failed to log usage record:", logError);
       });
 
-    // Transform string[][] to Record<string, string[]>
-    // translationResult.data.translations[lang_index] = array of translations for that language
-    // Each inner array contains translations for all input strings in that language
-    const translationsByLanguage: Record<string, string[]> = {};
-    for (let langIdx = 0; langIdx < targetLanguages.length; langIdx++) {
-      const langCode = targetLanguages[langIdx]!;
-      translationsByLanguage[langCode] =
-        translationResult.data.translations[langIdx] ?? [];
-    }
+    // Service now returns Record<string, string[]> directly (language code -> translated strings)
+    const translationsByLanguage: Record<string, string[]> = {
+      ...translationResult.data.translations,
+    };
 
     // Post-process: unwrap {{term}} and replace with dictionary translations
     let dictionaryCacheDebug: ReturnType<typeof serializeCache> | undefined;
