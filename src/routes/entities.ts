@@ -6,6 +6,12 @@
 
 import { Hono } from "hono";
 import { successResponse, errorResponse } from "@sudobility/whisperly_types";
+import type {
+  Entity,
+  EntityWithRole,
+  EntityMember,
+  EntityInvitation,
+} from "@sudobility/types";
 import { entityHelpers } from "../lib/entity-config";
 import { ErrorCode } from "../lib/error-codes";
 import { sendInvitationEmail } from "../services/email";
@@ -33,7 +39,7 @@ entitiesRouter.get("/", async c => {
       userId,
       userEmail ?? undefined
     );
-    return c.json(successResponse(userEntities));
+    return c.json(successResponse<EntityWithRole[]>(userEntities));
   } catch (error: any) {
     console.error("Error listing entities:", error);
     return c.json(
@@ -68,7 +74,7 @@ entitiesRouter.post("/", async c => {
       entitySlug,
       description,
     });
-    return c.json(successResponse(entity), 201);
+    return c.json(successResponse<Entity>(entity), 201);
   } catch (error: any) {
     console.error("Error creating entity:", error);
     return c.json(
@@ -110,7 +116,8 @@ entitiesRouter.get("/:entitySlug", async c => {
     }
 
     const role = await entityHelpers.members.getUserRole(entity.id, userId);
-    return c.json(successResponse({ ...entity, userRole: role }));
+    const entityWithRole: EntityWithRole = { ...entity, userRole: role! };
+    return c.json(successResponse<EntityWithRole>(entityWithRole));
   } catch (error: any) {
     console.error("Error getting entity:", error);
     return c.json(
@@ -156,7 +163,7 @@ entitiesRouter.put("/:entitySlug", async c => {
     }
 
     const updated = await entityHelpers.entity.updateEntity(entity.id, body);
-    return c.json(successResponse(updated));
+    return c.json(successResponse<Entity>(updated));
   } catch (error: any) {
     console.error("Error updating entity:", error);
     return c.json(
@@ -201,7 +208,7 @@ entitiesRouter.delete("/:entitySlug", async c => {
     }
 
     await entityHelpers.entity.deleteEntity(entity.id);
-    return c.json(successResponse(null));
+    return c.json(successResponse<null>(null));
   } catch (error: any) {
     console.error("Error deleting entity:", error);
     return c.json(
@@ -250,7 +257,7 @@ entitiesRouter.get("/:entitySlug/members", async c => {
     }
 
     const members = await entityHelpers.members.getMembers(entity.id);
-    return c.json(successResponse(members));
+    return c.json(successResponse<EntityMember[]>(members));
   } catch (error: any) {
     console.error("Error listing members:", error);
     return c.json(
@@ -312,7 +319,7 @@ entitiesRouter.put("/:entitySlug/members/:memberId", async c => {
       memberId,
       role
     );
-    return c.json(successResponse(updated));
+    return c.json(successResponse<EntityMember>(updated));
   } catch (error: any) {
     console.error("Error updating member role:", error);
     return c.json(
@@ -358,7 +365,7 @@ entitiesRouter.delete("/:entitySlug/members/:memberId", async c => {
     }
 
     await entityHelpers.members.removeMember(entity.id, memberId);
-    return c.json(successResponse(null));
+    return c.json(successResponse<null>(null));
   } catch (error: any) {
     console.error("Error removing member:", error);
     return c.json(
@@ -409,7 +416,7 @@ entitiesRouter.get("/:entitySlug/invitations", async c => {
     const invitations = await entityHelpers.invitations.getEntityInvitations(
       entity.id
     );
-    return c.json(successResponse(invitations));
+    return c.json(successResponse<EntityInvitation[]>(invitations));
   } catch (error: any) {
     console.error("Error listing invitations:", error);
     return c.json(
@@ -480,7 +487,7 @@ entitiesRouter.post("/:entitySlug/invitations", async c => {
       entityName: entity.displayName,
     }).catch(err => console.error("Failed to send invitation email:", err));
 
-    return c.json(successResponse(invitation), 201);
+    return c.json(successResponse<EntityInvitation>(invitation), 201);
   } catch (error: any) {
     console.error("Error creating invitation:", error);
     return c.json(
@@ -535,7 +542,7 @@ entitiesRouter.put("/:entitySlug/invitations/:invitationId", async c => {
       entityName: entity.displayName,
     }).catch(err => console.error("Failed to resend invitation email:", err));
 
-    return c.json(successResponse(renewed));
+    return c.json(successResponse<EntityInvitation>(renewed));
   } catch (error: any) {
     console.error("Error renewing invitation:", error);
     return c.json(
@@ -581,7 +588,7 @@ entitiesRouter.delete("/:entitySlug/invitations/:invitationId", async c => {
     }
 
     await entityHelpers.invitations.cancelInvitation(invitationId);
-    return c.json(successResponse(null));
+    return c.json(successResponse<null>(null));
   } catch (error: any) {
     console.error("Error canceling invitation:", error);
     return c.json(

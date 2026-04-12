@@ -6,6 +6,7 @@
 
 import { Hono } from "hono";
 import { successResponse, errorResponse } from "@sudobility/whisperly_types";
+import type { EntityInvitation } from "@sudobility/types";
 import { entityHelpers } from "../lib/entity-config";
 import { ErrorCode } from "../lib/error-codes";
 
@@ -23,13 +24,13 @@ invitationsRouter.get("/", async c => {
   const userEmail = c.get("userEmail");
 
   if (!userEmail) {
-    return c.json(successResponse([]));
+    return c.json(successResponse<EntityInvitation[]>([]));
   }
 
   try {
     const invitations =
       await entityHelpers.invitations.getUserPendingInvitations(userEmail);
-    return c.json(successResponse(invitations));
+    return c.json(successResponse<EntityInvitation[]>(invitations));
   } catch (error: any) {
     console.error("Error listing user invitations:", error);
     return c.json(
@@ -48,7 +49,7 @@ invitationsRouter.post("/:token/accept", async c => {
 
   try {
     await entityHelpers.invitations.acceptInvitation(token, userId);
-    return c.json(successResponse(null));
+    return c.json(successResponse<null>(null));
   } catch (error: any) {
     console.error("Error accepting invitation:", error);
     return c.json(
@@ -66,7 +67,7 @@ invitationsRouter.post("/:token/decline", async c => {
 
   try {
     await entityHelpers.invitations.declineInvitation(token);
-    return c.json(successResponse(null));
+    return c.json(successResponse<null>(null));
   } catch (error: any) {
     console.error("Error declining invitation:", error);
     return c.json(

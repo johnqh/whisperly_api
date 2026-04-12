@@ -4,7 +4,10 @@
  */
 
 import { Hono } from "hono";
-import { successResponse } from "@sudobility/whisperly_types";
+import {
+  successResponse,
+  type AvailableLanguage,
+} from "@sudobility/whisperly_types";
 import languagesConfig from "../config/languages.json";
 
 const availableLanguagesRouter = new Hono();
@@ -12,7 +15,9 @@ const availableLanguagesRouter = new Hono();
 // GET available languages
 // Returns list of available target languages from config
 availableLanguagesRouter.get("/", async c => {
-  return c.json(successResponse(languagesConfig));
+  return c.json(
+    successResponse<AvailableLanguage[]>(languagesConfig as AvailableLanguage[])
+  );
 });
 
 export default availableLanguagesRouter;

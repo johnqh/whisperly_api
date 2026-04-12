@@ -97,9 +97,10 @@ export async function translateStrings(
     debug.response = responseJson;
 
     if (!response.ok) {
-      const errorDetail = typeof responseJson === 'object' && responseJson !== null
-        ? (responseJson as Record<string, unknown>).error ?? responseText
-        : responseText;
+      const errorDetail =
+        typeof responseJson === "object" && responseJson !== null
+          ? ((responseJson as Record<string, unknown>).error ?? responseText)
+          : responseText;
       return {
         success: false,
         error: `Translation service error: ${response.status} - ${errorDetail}`,
@@ -129,7 +130,11 @@ export async function translateStrings(
       }
     }
 
-    if (!translationData.translations || typeof translationData.translations !== "object" || Array.isArray(translationData.translations)) {
+    if (
+      !translationData.translations ||
+      typeof translationData.translations !== "object" ||
+      Array.isArray(translationData.translations)
+    ) {
       return {
         success: false,
         error: `Translation service response missing 'translations' map (got ${Array.isArray(translationData.translations) ? "array" : typeof translationData.translations})`,

@@ -129,7 +129,7 @@ analyticsRouter.get(
         by_project: [],
         by_date: [],
       };
-      return c.json(successResponse(emptyResponse));
+      return c.json(successResponse<AnalyticsResponse>(emptyResponse));
     }
 
     const projectIds = entityProjects.map(p => p.id);
@@ -248,7 +248,7 @@ analyticsRouter.get(
       by_date: byDate,
     };
 
-    return c.json(successResponse(response));
+    return c.json(successResponse<AnalyticsResponse>(response));
   }
 );
 

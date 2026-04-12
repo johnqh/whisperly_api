@@ -15,7 +15,11 @@ import {
   entitySlugParamSchema,
   entityProjectIdParamSchema,
 } from "../schemas";
-import { successResponse, errorResponse } from "@sudobility/whisperly_types";
+import {
+  successResponse,
+  errorResponse,
+  type Project,
+} from "@sudobility/whisperly_types";
 import {
   getEntityWithPermission,
   getEntityErrorStatus,
@@ -43,7 +47,7 @@ projectsRouter.get("/", zValidator("param", entitySlugParamSchema), async c => {
       .from(projects)
       .where(eq(projects.entity_id, result.entity.id));
 
-    return c.json(successResponse(rows));
+    return c.json(successResponse<Project[]>(rows));
   } catch (err) {
     console.error("Error fetching projects:", err);
     const message =
@@ -92,7 +96,7 @@ projectsRouter.get(
         );
       }
 
-      return c.json(successResponse(rows[0]));
+      return c.json(successResponse<Project>(rows[0]));
     } catch (err) {
       console.error("Error fetching project:", err);
       const message =
@@ -159,7 +163,7 @@ projectsRouter.post(
         })
         .returning();
 
-      return c.json(successResponse(rows[0]), 201);
+      return c.json(successResponse<Project>(rows[0]), 201);
     } catch (err) {
       console.error("Error creating project:", err);
       const message =
@@ -250,7 +254,7 @@ projectsRouter.put(
         .where(eq(projects.id, projectId))
         .returning();
 
-      return c.json(successResponse(rows[0]));
+      return c.json(successResponse<Project>(rows[0]));
     } catch (err) {
       console.error("Error updating project:", err);
       const message =
@@ -300,7 +304,7 @@ projectsRouter.delete(
         );
       }
 
-      return c.json(successResponse(rows[0]));
+      return c.json(successResponse<Project>(rows[0]));
     } catch (err) {
       console.error("Error deleting project:", err);
       const message =
@@ -362,7 +366,7 @@ projectsRouter.post(
         .where(eq(projects.id, projectId))
         .returning();
 
-      return c.json(successResponse(rows[0]));
+      return c.json(successResponse<Project>(rows[0]));
     } catch (err) {
       console.error("Error generating API key:", err);
       const message =
@@ -422,7 +426,7 @@ projectsRouter.delete(
         .where(eq(projects.id, projectId))
         .returning();
 
-      return c.json(successResponse(rows[0]));
+      return c.json(successResponse<Project>(rows[0]));
     } catch (err) {
       console.error("Error removing API key:", err);
       const message =

@@ -19,6 +19,8 @@ import {
   successResponse,
   errorResponse,
   type DictionaryTranslations,
+  type DictionarySearchResponse,
+  type DictionaryListItem,
 } from "@sudobility/whisperly_types";
 import { invalidateProjectCache } from "../services/dictionaryCache";
 import {
@@ -103,7 +105,7 @@ dictionaryRouter.get(
       })
     );
 
-    return c.json(successResponse(results));
+    return c.json(successResponse<DictionaryListItem[]>(results));
   }
 );
 
@@ -164,12 +166,11 @@ dictionaryRouter.get(
     const dictionaryId = matchingEntries[0]!.dictionary_id;
     const translations = await getDictionaryTranslations(dictionaryId);
 
-    return c.json(
-      successResponse({
-        dictionary_id: dictionaryId,
-        translations,
-      })
-    );
+    const searchResult: DictionarySearchResponse = {
+      dictionary_id: dictionaryId,
+      translations,
+    };
+    return c.json(successResponse<DictionarySearchResponse>(searchResult));
   }
 );
 
@@ -261,12 +262,11 @@ dictionaryRouter.post(
 
       const updatedTranslations =
         await getDictionaryTranslations(existingDictionaryId);
-      return c.json(
-        successResponse({
-          dictionary_id: existingDictionaryId,
-          translations: updatedTranslations,
-        })
-      );
+      const upsertResult: DictionarySearchResponse = {
+        dictionary_id: existingDictionaryId,
+        translations: updatedTranslations,
+      };
+      return c.json(successResponse<DictionarySearchResponse>(upsertResult));
     }
 
     // Create new dictionary
@@ -295,13 +295,11 @@ dictionaryRouter.post(
     // Invalidate dictionary cache for this project
     invalidateProjectCache(result.entity.id, projectId);
 
-    return c.json(
-      successResponse({
-        dictionary_id: newDictionaryId,
-        translations,
-      }),
-      201
-    );
+    const createResult: DictionarySearchResponse = {
+      dictionary_id: newDictionaryId,
+      translations,
+    };
+    return c.json(successResponse<DictionarySearchResponse>(createResult), 201);
   }
 );
 
@@ -388,12 +386,11 @@ dictionaryRouter.put(
 
     const updatedTranslations = await getDictionaryTranslations(dictionaryId);
 
-    return c.json(
-      successResponse({
-        dictionary_id: dictionaryId,
-        translations: updatedTranslations,
-      })
-    );
+    const updateResult: DictionarySearchResponse = {
+      dictionary_id: dictionaryId,
+      translations: updatedTranslations,
+    };
+    return c.json(successResponse<DictionarySearchResponse>(updateResult));
   }
 );
 
@@ -452,12 +449,11 @@ dictionaryRouter.delete(
     // Invalidate dictionary cache for this project
     invalidateProjectCache(result.entity.id, projectId);
 
-    return c.json(
-      successResponse({
-        dictionary_id: dictionaryId,
-        translations,
-      })
-    );
+    const deleteResult: DictionarySearchResponse = {
+      dictionary_id: dictionaryId,
+      translations,
+    };
+    return c.json(successResponse<DictionarySearchResponse>(deleteResult));
   }
 );
 

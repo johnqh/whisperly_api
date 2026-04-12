@@ -189,7 +189,8 @@ translateRouter.post(
         : null;
       const url = new URL(c.req.url);
       const queryKey = url.searchParams.get("api_key");
-      const providedKey = queryKey || (bearerToken?.startsWith("wh_") ? bearerToken : null);
+      const providedKey =
+        queryKey || (bearerToken?.startsWith("wh_") ? bearerToken : null);
 
       if (!providedKey || providedKey !== project.api_key) {
         return c.json(errorResponse("Invalid or missing API key"), 401);

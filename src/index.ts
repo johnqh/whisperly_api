@@ -10,7 +10,11 @@ import { logger } from "hono/logger";
 import { bodyLimit } from "hono/body-limit";
 import { initDatabase, db } from "./db";
 import routes from "./routes";
-import { successResponse, errorResponse } from "@sudobility/whisperly_types";
+import {
+  successResponse,
+  errorResponse,
+  type HealthCheckData,
+} from "@sudobility/whisperly_types";
 import { getEnv } from "./lib/env-helper";
 import { ErrorCode } from "./lib/error-codes";
 import { sql } from "drizzle-orm";
@@ -67,14 +71,16 @@ app.use(
 );
 
 // Health check endpoints
-const healthResponse = {
+const healthResponse: HealthCheckData = {
   name: "Whisperly API",
   version: "1.0.0",
   status: "healthy",
 };
 
-app.get("/", c => c.json(successResponse(healthResponse)));
-app.get("/health", c => c.json(successResponse(healthResponse)));
+app.get("/", c => c.json(successResponse<HealthCheckData>(healthResponse)));
+app.get("/health", c =>
+  c.json(successResponse<HealthCheckData>(healthResponse))
+);
 
 /**
  * Detailed health check endpoint.
@@ -120,14 +126,16 @@ app.get("/health/detailed", async c => {
   const overallStatus =
     checks.database.status === "healthy" ? "healthy" : "degraded";
 
-  return c.json(
-    successResponse({
-      ...healthResponse,
-      status: overallStatus,
-      checks,
-      uptime: process.uptime(),
-    })
-  );
+  const detailedResponse: HealthCheckData & {
+    checks: typeof checks;
+    uptime: number;
+  } = {
+    ...healthResponse,
+    status: overallStatus,
+    checks,
+    uptime: process.uptime(),
+  };
+  return c.json(successResponse(detailedResponse));
 });
 
 // API routes

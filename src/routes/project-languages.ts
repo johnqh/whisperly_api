@@ -12,7 +12,11 @@ import {
   entityProjectIdParamSchema,
   projectLanguagesUpdateSchema,
 } from "../schemas";
-import { successResponse, errorResponse } from "@sudobility/whisperly_types";
+import {
+  successResponse,
+  errorResponse,
+  type ProjectLanguagesResponse,
+} from "@sudobility/whisperly_types";
 import {
   getEntityWithPermission,
   getEntityErrorStatus,
@@ -57,12 +61,11 @@ projectLanguagesRouter.get(
       .where(eq(projectLanguages.project_id, projectId));
 
     if (existing.length > 0) {
-      return c.json(
-        successResponse({
-          project_id: projectId,
-          languages: existing[0]!.languages,
-        })
-      );
+      const result: ProjectLanguagesResponse = {
+        project_id: projectId,
+        languages: existing[0]!.languages,
+      };
+      return c.json(successResponse<ProjectLanguagesResponse>(result));
     }
 
     // Create default record with "en"
@@ -74,11 +77,12 @@ projectLanguagesRouter.get(
       })
       .returning();
 
+    const createdResult: ProjectLanguagesResponse = {
+      project_id: projectId,
+      languages: created[0]!.languages,
+    };
     return c.json(
-      successResponse({
-        project_id: projectId,
-        languages: created[0]!.languages,
-      }),
+      successResponse<ProjectLanguagesResponse>(createdResult),
       201
     );
   }
@@ -130,12 +134,11 @@ projectLanguagesRouter.post(
         .where(eq(projectLanguages.project_id, projectId))
         .returning();
 
-      return c.json(
-        successResponse({
-          project_id: projectId,
-          languages: updated[0]!.languages,
-        })
-      );
+      const updatedResult: ProjectLanguagesResponse = {
+        project_id: projectId,
+        languages: updated[0]!.languages,
+      };
+      return c.json(successResponse<ProjectLanguagesResponse>(updatedResult));
     }
 
     // Create new record
@@ -147,13 +150,11 @@ projectLanguagesRouter.post(
       })
       .returning();
 
-    return c.json(
-      successResponse({
-        project_id: projectId,
-        languages: created[0]!.languages,
-      }),
-      201
-    );
+    const newResult: ProjectLanguagesResponse = {
+      project_id: projectId,
+      languages: created[0]!.languages,
+    };
+    return c.json(successResponse<ProjectLanguagesResponse>(newResult), 201);
   }
 );
 

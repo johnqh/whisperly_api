@@ -12,6 +12,7 @@ import {
   type RateLimitsConfigResponse,
   type RateLimitHistoryResponse,
   type RateLimitsConfigData,
+  type RateLimitHistoryData,
   type RateLimitTier,
 } from "@sudobility/types";
 import {
@@ -203,13 +204,12 @@ ratelimitsRouter.get("/history/:periodType", async c => {
 
     // If RevenueCat is not configured, return empty history
     if (!isRevenueCatConfigured()) {
-      return c.json(
-        successResponse({
-          periodType: periodTypeParam as RateLimitPeriodType,
-          entries: [],
-          totalEntries: 0,
-        })
-      );
+      const emptyHistory: RateLimitHistoryData = {
+        periodType: periodTypeParam as RateLimitPeriodType,
+        entries: [],
+        totalEntries: 0,
+      };
+      return c.json(successResponse(emptyHistory) as RateLimitHistoryResponse);
     }
 
     const periodType = periodTypeParam as RateLimitPeriodType;

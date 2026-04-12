@@ -3,7 +3,11 @@
  */
 
 import { Hono } from "hono";
-import { NONE_ENTITLEMENT } from "@sudobility/types";
+import {
+  type BackendSubscriptionResult,
+  NONE_ENTITLEMENT,
+  type UserInfoResponse,
+} from "@sudobility/types";
 import { getUserInfo } from "../services/firebase";
 import { successResponse, errorResponse } from "@sudobility/whisperly_types";
 import { getSubscriptionHelper, getTestMode } from "../middleware/subscription";
@@ -35,7 +39,7 @@ usersRouter.get("/:userId", async c => {
     return c.json(errorResponse("User not found"), 403);
   }
 
-  return c.json(successResponse(userInfo));
+  return c.json(successResponse<UserInfoResponse>(userInfo));
 });
 
 /**
@@ -43,7 +47,7 @@ usersRouter.get("/:userId", async c => {
  *
  * Get user subscription status (requires Firebase auth).
  */
-usersRouter.get("/:userId/subscriptions", async (c) => {
+usersRouter.get("/:userId/subscriptions", async c => {
   const requestedUserId = c.req.param("userId");
   const tokenUserId = c.get("userId");
 
@@ -65,13 +69,22 @@ usersRouter.get("/:userId/subscriptions", async (c) => {
       requestedUserId,
       testMode
     );
-    const subscriptionResult = {
-      hasSubscription: subscriptionInfo.entitlements.length > 0 && !subscriptionInfo.entitlements.includes(NONE_ENTITLEMENT),
+    const subscriptionResult: BackendSubscriptionResult = {
+      hasSubscription:
+        subscriptionInfo.entitlements.length > 0 &&
+        !subscriptionInfo.entitlements.includes(NONE_ENTITLEMENT),
       entitlements: subscriptionInfo.entitlements,
-      subscriptionStartedAt: subscriptionInfo.subscriptionStartedAt,
+      subscriptionStartedAt:
+        subscriptionInfo.subscriptionStartedAt?.toISOString() ?? null,
       platform: subscriptionInfo.platform,
+      productIdentifier: subscriptionInfo.productIdentifier,
+      expiresDate: subscriptionInfo.expiresDate?.toISOString() ?? null,
+      willRenew: subscriptionInfo.willRenew,
+      managementUrl: subscriptionInfo.managementUrl,
     };
-    return c.json(successResponse(subscriptionResult));
+    return c.json(
+      successResponse<BackendSubscriptionResult>(subscriptionResult)
+    );
   } catch (error) {
     console.error("Error fetching subscription:", error);
     return c.json(errorResponse("Failed to fetch subscription status"), 500);
