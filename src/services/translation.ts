@@ -73,6 +73,11 @@ export async function translateStrings(
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
+    console.log(
+      "[translate] Payload sent to shapeshyft:",
+      JSON.stringify(payload, null, 2)
+    );
+
     const response = await fetch(translationServiceUrl, {
       method: "POST",
       headers: {
