@@ -273,6 +273,10 @@ translateRouter.post(
     const translationResult = await translateStrings({
       texts: processedStrings,
       target_language_codes: targetLanguages,
+      ...(project.instructions ? { context: project.instructions } : {}),
+      ...(body.source_language
+        ? { source_language_code: body.source_language }
+        : {}),
     });
 
     // Handle translation service failure
