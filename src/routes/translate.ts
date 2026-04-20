@@ -270,10 +270,12 @@ translateRouter.post(
     }
 
     // Call the translation service with processed strings
+    // Use request-level instructions if provided, otherwise fall back to project's stored instructions
+    const instructions = body.instructions ?? project.instructions;
     const translationResult = await translateStrings({
       texts: processedStrings,
       target_language_codes: targetLanguages,
-      ...(project.instructions ? { context: project.instructions } : {}),
+      ...(instructions ? { context: instructions } : {}),
       ...(body.source_language
         ? { source_language_code: body.source_language }
         : {}),

@@ -133,6 +133,8 @@ export const translationRequestSchema = z.object({
   source_language: z.string().min(2).max(10).optional(),
   /** Skip dictionary term matching/replacement. Set to true when translating dictionary entries. */
   skip_dictionaries: z.boolean().optional().default(false),
+  /** Project instructions/context to guide translation. Overrides project's stored instructions if provided. */
+  instructions: z.string().max(10000).optional(),
 });
 
 // =============================================================================
