@@ -269,11 +269,27 @@ translateRouter.post(
       foundTerms = extractDictionaryTerms(body.strings, dictionaryTerms);
     }
 
-    // Call the translation service with processed strings
+    // Normalize all {{...}} placeholders to opaque numeric tokens before sending
+    // to the translation service. This prevents the service from translating
+    // placeholder content (e.g., {{X-Cycle}} becoming {{X循环}}).
+    const placeholderMaps: Map<string, string>[] = []; // per-string: token -> original
+    const normalizedStrings = processedStrings.map(str => {
+      const map = new Map<string, string>();
+      let counter = 0;
+      const normalized = str.replace(/\{\{([^}]+)\}\}/g, (_match, content) => {
+        const token = `__PH${counter++}__`;
+        map.set(token, content);
+        return `{{${token}}}`;
+      });
+      placeholderMaps.push(map);
+      return normalized;
+    });
+
+    // Call the translation service with normalized strings
     // Use request-level instructions if provided, otherwise fall back to project's stored instructions
     const instructions = body.instructions ?? project.instructions;
     const translationResult = await translateStrings({
-      texts: processedStrings,
+      texts: normalizedStrings,
       target_language_codes: targetLanguages,
       ...(instructions ? { context: instructions } : {}),
       ...(body.source_language
@@ -335,6 +351,21 @@ translateRouter.post(
     const translationsByLanguage: Record<string, string[]> = {
       ...translationResult.data.translations,
     };
+
+    // Restore original placeholder content from opaque tokens
+    for (const [langCode, translations] of Object.entries(
+      translationsByLanguage
+    )) {
+      translationsByLanguage[langCode] = translations.map((text, idx) => {
+        const map = placeholderMaps[idx];
+        if (!map || map.size === 0) return text;
+        let result = text;
+        for (const [token, original] of map) {
+          result = result.replace(`{{${token}}}`, `{{${original}}}`);
+        }
+        return result;
+      });
+    }
 
     // Post-process: unwrap {{term}} and replace with dictionary translations
     let dictionaryCacheDebug: ReturnType<typeof serializeCache> | undefined;
