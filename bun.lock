@@ -7,9 +7,9 @@
       "dependencies": {
         "@hono/zod-validator": "^0.7.5",
         "@sudobility/auth_service": "^1.1.16",
-        "@sudobility/entity_service": "^1.0.33",
-        "@sudobility/ratelimit_service": "^1.0.33",
-        "@sudobility/subscription_service": "^1.0.17",
+        "@sudobility/entity_service": "^1.0.34",
+        "@sudobility/ratelimit_service": "^1.0.34",
+        "@sudobility/subscription_service": "^1.0.18",
         "@sudobility/types": "^1.9.61",
         "@sudobility/whisperly_types": "^1.0.33",
         "drizzle-orm": "^0.45.0",
@@ -282,11 +282,11 @@
 
     "@sudobility/auth_service": ["@sudobility/auth_service@1.1.16", "", { "peerDependencies": { "@sudobility/types": "^1.9.61", "firebase-admin": "^13.0.0" } }, "sha512-pcooLbL+7M46GmzczIfXt56kntPMWSYHLEMKLXXeOGxOx5O8E6OdPeeUKD1j9pjx+R2EUiyw12QOFgRf4I/b5w=="],
 
-    "@sudobility/entity_service": ["@sudobility/entity_service@1.0.33", "", { "peerDependencies": { "@sudobility/types": "^1.9.61", "drizzle-orm": "^0.45.0", "hono": "^4.0.0" } }, "sha512-9IMRa/HK6tcEHSB7twsORmXkJ9pS8K4Vrw/wd42Ax7X9Wpu5iqFcwZaIyScpClbj88n24sNBf0Jc6gfijnjMLw=="],
+    "@sudobility/entity_service": ["@sudobility/entity_service@1.0.34", "", { "peerDependencies": { "@sudobility/types": "^1.9.61", "drizzle-orm": "^0.45.0", "hono": "^4.0.0" } }, "sha512-KzQY6boFSsI+gNQeRqYAeyNGk24oZ+U+94y0yjK3v2bujJbsZc85Spzr3JKPqnBT9L5BVWWsdM7CLa9uszySUw=="],
 
-    "@sudobility/ratelimit_service": ["@sudobility/ratelimit_service@1.0.33", "", { "peerDependencies": { "@sudobility/types": "^1.9.61", "drizzle-orm": "^0.45.0", "hono": "^4.0.0", "postgres": "^3.4.0" } }, "sha512-Y7Ggcc0IOJMAKGqnnN0jp3BjMXnB6f6ZlCN6W8bPalJKVKwwJFLowqVnsOMicfJPtOtTY0CgMBBl4aG0WmQyvw=="],
+    "@sudobility/ratelimit_service": ["@sudobility/ratelimit_service@1.0.34", "", { "peerDependencies": { "@sudobility/types": "^1.9.61", "drizzle-orm": "^0.45.0", "hono": "^4.0.0", "postgres": "^3.4.0" } }, "sha512-hR6tcK0C1xD8dLdMx/dUcz0QYTCCiahGH89sgPn9q0jpKH22PpdPI5d9X/QV/l1hMNyM3J38dyVTUsQ+9lL3sw=="],
 
-    "@sudobility/subscription_service": ["@sudobility/subscription_service@1.0.17", "", {}, "sha512-4lh/KzfQ1S5cPnqO3Gq1yBE0IJOfNzDwP7Xs8BNCJbVHmeEVCVGg2ozVMQ5pnG+HOhDleRwQErnfjLb3t7vEVA=="],
+    "@sudobility/subscription_service": ["@sudobility/subscription_service@1.0.18", "", {}, "sha512-On7eS3u+fx6I+ATSLS+7XXU4wVts0j+RUbE1VO9PojiH1QtCLoNZI7FC8+9FfvxibmMEF0l1YC642YEjZmSdNQ=="],
 
     "@sudobility/types": ["@sudobility/types@1.9.61", "", {}, "sha512-SODGpstB/iKfK3H/4BvJx/FBcc1h3gutUjGotyxN19VnOfWyzaDoEmW7eyoxOAYhZyXMXagSiii+NIEZvuxKog=="],
 
