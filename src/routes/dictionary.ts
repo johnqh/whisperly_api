@@ -203,10 +203,14 @@ dictionaryRouter.post(
       );
     }
 
-    // Check if any of the translations already exist (case-insensitive)
+    // Check if the English translation already exists (case-insensitive)
+    // Only English is checked for duplicates — other languages may have
+    // identical translations for different English terms (e.g. "race" and
+    // "game" can both translate to the same word in Chinese).
     let existingDictionaryId: string | null = null;
 
-    for (const [langCode, text] of Object.entries(translations)) {
+    const englishText = translations["en"];
+    if (englishText) {
       const matchingEntries = await db
         .select({
           dictionary_id: dictionaryEntry.dictionary_id,
@@ -217,15 +221,14 @@ dictionaryRouter.post(
           and(
             eq(dictionary.entity_id, result.entity.id),
             eq(dictionary.project_id, projectId),
-            eq(dictionaryEntry.language_code, langCode),
-            sql`LOWER(${dictionaryEntry.text}) = LOWER(${text})`
+            eq(dictionaryEntry.language_code, "en"),
+            sql`LOWER(${dictionaryEntry.text}) = LOWER(${englishText})`
           )
         )
         .limit(1);
 
       if (matchingEntries.length > 0) {
         existingDictionaryId = matchingEntries[0]!.dictionary_id;
-        break;
       }
     }
 
