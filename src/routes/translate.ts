@@ -35,6 +35,10 @@ import {
   serializeCache,
   type TermMatch,
 } from "../services/dictionaryCache";
+import {
+  maskPlaceholders,
+  restorePlaceholders,
+} from "../services/placeholders";
 import { rateLimitMiddleware, getTestMode } from "../middleware/rateLimit";
 
 const translateRouter = new Hono();
@@ -274,15 +278,9 @@ translateRouter.post(
     // placeholder content (e.g., {{X-Cycle}} becoming {{X循环}}).
     const placeholderMaps: Map<string, string>[] = []; // per-string: token -> original
     const normalizedStrings = processedStrings.map(str => {
-      const map = new Map<string, string>();
-      let counter = 0;
-      const normalized = str.replace(/\{\{([^}]+)\}\}/g, (_match, content) => {
-        const token = `__PH${counter++}__`;
-        map.set(token, content);
-        return `{{${token}}}`;
-      });
+      const { text, map } = maskPlaceholders(str);
       placeholderMaps.push(map);
-      return normalized;
+      return text;
     });
 
     // Call the translation service with normalized strings
@@ -352,18 +350,33 @@ translateRouter.post(
       ...translationResult.data.translations,
     };
 
-    // Restore original placeholder content from opaque tokens
+    // Restore original placeholder content from opaque tokens. The model does
+    // not always echo tokens back verbatim, so restoration repairs damaged
+    // brackets rather than leaving `{{__PH5__]]` in user-visible output.
     for (const [langCode, translations] of Object.entries(
       translationsByLanguage
     )) {
       translationsByLanguage[langCode] = translations.map((text, idx) => {
         const map = placeholderMaps[idx];
-        if (!map || map.size === 0) return text;
-        let result = text;
-        for (const [token, original] of map) {
-          result = result.replace(`{{${token}}}`, `{{${original}}}`);
+        if (!map) return text;
+        const restoration = restorePlaceholders(text, map);
+        if (
+          restoration.repaired > 0 ||
+          restoration.missing.length > 0 ||
+          restoration.duplicated.length > 0 ||
+          restoration.unknown.length > 0
+        ) {
+          console.warn(
+            `[translate] placeholder damage in ${langCode}[${idx}]:`,
+            JSON.stringify({
+              repaired: restoration.repaired,
+              missing: restoration.missing,
+              duplicated: restoration.duplicated,
+              unknown: restoration.unknown,
+            })
+          );
         }
-        return result;
+        return restoration.text;
       });
     }
 
