@@ -167,9 +167,33 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/** Matches an existing `{{...}}` interpolation placeholder. */
+const PLACEHOLDER_SPAN_RE = /\{\{[^}]*\}\}/g;
+
+/**
+ * Locate existing `{{...}}` placeholders so dictionary matching can leave them
+ * alone. A caller's placeholder often contains an ordinary word — `{{sudoku}}`
+ * — and wrapping that word would nest brackets (`{{{{sudoku}}}}`), which no
+ * later stage can unpick: masking mis-parses the nested form and the outer
+ * brackets survive into the response as `{{数独}}`.
+ */
+function findPlaceholderSpans(text: string): Array<{
+  start: number;
+  end: number;
+}> {
+  const spans: Array<{ start: number; end: number }> = [];
+  PLACEHOLDER_SPAN_RE.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = PLACEHOLDER_SPAN_RE.exec(text)) !== null) {
+    spans.push({ start: match.index, end: match.index + match[0].length });
+  }
+  return spans;
+}
+
 /**
  * Find all dictionary terms in a text string
- * Uses whole-word matching, case-insensitive, longest match first
+ * Uses whole-word matching, case-insensitive, longest match first.
+ * Terms inside an existing `{{...}}` placeholder are skipped.
  */
 export function findDictionaryTerms(
   text: string,
@@ -177,10 +201,16 @@ export function findDictionaryTerms(
 ): TermMatch[] {
   const matches: TermMatch[] = [];
   const usedRanges: Array<{ start: number; end: number }> = [];
+  const placeholderSpans = findPlaceholderSpans(text);
 
   // Check if a range overlaps with any already-matched range
   const overlaps = (start: number, end: number): boolean => {
     return usedRanges.some(range => start < range.end && end > range.start);
+  };
+
+  // Check if a range touches an existing {{...}} placeholder
+  const insidePlaceholder = (start: number, end: number): boolean => {
+    return placeholderSpans.some(span => start < span.end && end > span.start);
   };
 
   // Iterate through terms (longest first)
@@ -197,6 +227,11 @@ export function findDictionaryTerms(
 
       // Skip if this range overlaps with an already-matched term
       if (overlaps(start, end)) {
+        continue;
+      }
+
+      // Skip terms sitting inside a caller's {{...}} placeholder
+      if (insidePlaceholder(start, end)) {
         continue;
       }
 

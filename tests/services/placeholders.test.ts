@@ -3,11 +3,57 @@ import {
   maskPlaceholders,
   restorePlaceholders,
 } from "../../src/services/placeholders";
+import {
+  findDictionaryTerms,
+  wrapTermsWithBrackets,
+  unwrapAndTranslate,
+  type ProjectDictionaryCache,
+} from "../../src/services/dictionaryCache";
 
 /** Mask a string, then restore whatever the model "returned". */
 function roundTrip(source: string, modelOutput: (masked: string) => string) {
   const { text, map } = maskPlaceholders(source);
   return restorePlaceholders(modelOutput(text), map);
+}
+
+/** Minimal cache: term -> per-language translation. */
+function buildCache(
+  entries: Array<[string, Record<string, string>]>
+): ProjectDictionaryCache {
+  const dictionary_map = new Map<string, Map<string, string>>();
+  const text_map = new Map<string, string>();
+  for (const [dictId, langMap] of entries) {
+    const langEntries = new Map<string, string>();
+    for (const [lang, text] of Object.entries(langMap)) {
+      langEntries.set(lang, text);
+      const lowerText = text.toLowerCase();
+      if (!text_map.has(lowerText)) text_map.set(lowerText, dictId);
+    }
+    dictionary_map.set(dictId, langEntries);
+  }
+  const terms_sorted = Array.from(text_map.keys()).sort(
+    (a, b) => b.length - a.length
+  );
+  return { dictionary_map, text_map, terms_sorted, loaded_at: Date.now() };
+}
+
+/**
+ * Run a string through the full translate pipeline the route performs:
+ * dictionary wrap -> placeholder mask -> model -> restore -> dictionary unwrap.
+ */
+function fullPipeline(
+  source: string,
+  cache: ProjectDictionaryCache,
+  lang: string,
+  model: (masked: string) => string
+): string {
+  const matches = findDictionaryTerms(source, cache);
+  const wrapped = wrapTermsWithBrackets(source, matches);
+  const { text, map } = maskPlaceholders(wrapped);
+  const restored = restorePlaceholders(model(text), map).text;
+  return matches.length > 0
+    ? unwrapAndTranslate(restored, matches, lang, cache)
+    : restored;
 }
 
 describe("maskPlaceholders", () => {
@@ -81,9 +127,11 @@ describe("restorePlaceholders", () => {
     expect(result.repaired).toBe(1);
   });
 
-  test("repairs extra closing braces", () => {
+  test("absorbs at most two closing brackets", () => {
+    // Deliberate limit: a third bracket is left alone rather than eaten, so a
+    // bracket belonging to surrounding text survives restoration.
     const result = roundTrip("{{value1}} cells", () => "{{__PH0__}}} celle");
-    expect(result.text).toBe("{{value1}} celle");
+    expect(result.text).toBe("{{value1}}} celle");
   });
 
   test("reports a dropped token instead of silently succeeding", () => {
@@ -146,5 +194,52 @@ describe("restorePlaceholders", () => {
       () => "Aprende {{__PH0__}} ahora"
     );
     expect(result.text).toBe("Aprende {{X-Cycle}} ahora");
+  });
+});
+
+describe("full translate pipeline", () => {
+  const cache = buildCache([
+    ["dict-sudoku", { en: "sudoku", zh: "数独", de: "Sudoku" }],
+    ["dict-sudojo", { en: "Sudojo", zh: "数道场", de: "Sudojo" }],
+  ]);
+
+  test("leaves a dictionary term that sits inside a placeholder untouched", () => {
+    // Regression: "sudoku" is both a dictionary term and the contents of the
+    // caller's {{sudoku}} placeholder. Wrapping it nested the brackets and
+    // shipped "{{数独}}" instead of interpolating the caller's value.
+    const result = fullPipeline(
+      "{{levelTitle}} {{sudoku}} Coach - {{techniques}} | Sudojo",
+      cache,
+      "zh",
+      masked => masked.replace("Coach", "教练")
+    );
+
+    expect(result).toBe(
+      "{{levelTitle}} {{sudoku}} 教练 - {{techniques}} | 数道场"
+    );
+    expect(result).not.toContain("数独");
+  });
+
+  test("still substitutes a dictionary term outside a placeholder", () => {
+    const result = fullPipeline(
+      "Play {{count}} sudoku puzzles",
+      cache,
+      "zh",
+      masked => masked.replace("Play", "玩").replace("puzzles", "谜题")
+    );
+
+    expect(result).toBe("玩 {{count}} 数独 谜题");
+  });
+
+  test("survives a model that damages the token brackets", () => {
+    const result = fullPipeline(
+      "{{levelTitle}} {{sudoku}} Coach",
+      cache,
+      "de",
+      masked =>
+        masked.replace("{{__PH1__}}", "{{__PH1__]]").replace("Coach", "Trainer")
+    );
+
+    expect(result).toBe("{{levelTitle}} {{sudoku}} Trainer");
   });
 });

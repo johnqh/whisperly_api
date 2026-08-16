@@ -23,9 +23,14 @@ const SOURCE_PLACEHOLDER_RE = /\{\{([^}]+)\}\}/g;
  * full-width/CJK forms models reach for when the target language is CJK.
  * Padding is only absorbed when it sits inside brackets, so a bare `__PH0__`
  * does not swallow the space that separates it from the preceding word.
+ *
+ * At most two closing brackets are absorbed. Every corruption seen in practice
+ * is two characters or fewer (`]]`, `｝｝`, a lone `}`, or none), and stopping
+ * at two keeps a third bracket that belongs to surrounding text from being
+ * eaten along with the token.
  */
 const TOKEN_RE =
-  /(?:[{[(<｛【〔]{1,3}[ \t]*)?_{1,3}PH(\d+)_{1,3}(?:[ \t]*[}\])>｝】〕]{1,3})?/gi;
+  /(?:[{[(<｛【〔]{1,3}[ \t]*)?_{1,3}PH(\d+)_{1,3}(?:[ \t]*[}\])>｝】〕]{1,2})?/gi;
 
 /** The exact form a well-behaved model returns. */
 function canonicalToken(index: string): string {

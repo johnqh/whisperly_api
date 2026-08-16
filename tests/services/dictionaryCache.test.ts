@@ -182,6 +182,44 @@ describe("dictionaryCache", () => {
       // Due to word boundary rules, C++ may or may not match depending on context
       expect(Array.isArray(matches)).toBe(true);
     });
+
+    test("skips terms inside an existing {{...}} placeholder", () => {
+      const cache = buildMockCache([
+        ["dict-1", { en: "sudoku", zh: "数独" }],
+      ]);
+
+      // The caller's own interpolation placeholder happens to contain the term.
+      // Wrapping it would nest brackets and leak "{{数独}}" into the response.
+      const matches = findDictionaryTerms(
+        "{{levelTitle}} {{sudoku}} Coach",
+        cache
+      );
+
+      expect(matches).toHaveLength(0);
+    });
+
+    test("still matches the same term outside a placeholder", () => {
+      const cache = buildMockCache([
+        ["dict-1", { en: "sudoku", zh: "数独" }],
+      ]);
+
+      const matches = findDictionaryTerms("Play {{count}} sudoku puzzles", cache);
+
+      expect(matches).toHaveLength(1);
+      expect(matches[0]!.term).toBe("sudoku");
+      expect(matches[0]!.start).toBeGreaterThan("Play {{count}}".length - 1);
+    });
+
+    test("matches outside a placeholder but not inside it", () => {
+      const cache = buildMockCache([
+        ["dict-1", { en: "sudoku", zh: "数独" }],
+      ]);
+
+      const matches = findDictionaryTerms("{{sudoku}} means sudoku", cache);
+
+      expect(matches).toHaveLength(1);
+      expect(matches[0]!.start).toBe("{{sudoku}} means ".length);
+    });
   });
 
   describe("wrapTermsWithBrackets", () => {
