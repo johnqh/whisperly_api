@@ -37,11 +37,20 @@ import {
 } from "../services/dictionaryCache";
 import {
   maskPlaceholders,
-  restorePlaceholders,
+  withPlaceholderInstructions,
+  buildRetryInstructions,
 } from "../services/placeholders";
+import { restoreWithIntegrity } from "../services/placeholderRepair";
 import { rateLimitMiddleware, getTestMode } from "../middleware/rateLimit";
+import { getEnv } from "../lib/env-helper";
 
 const translateRouter = new Hono();
+
+/** How many times a token-damaged string is sent back to the model. */
+const PLACEHOLDER_RETRY_ATTEMPTS = parseInt(
+  getEnv("PLACEHOLDER_RETRY_ATTEMPTS", "1")!,
+  10
+);
 
 /**
  * Helper to get client IP address from request
@@ -286,10 +295,17 @@ translateRouter.post(
     // Call the translation service with normalized strings
     // Use request-level instructions if provided, otherwise fall back to project's stored instructions
     const instructions = body.instructions ?? project.instructions;
+    const hasPlaceholders = placeholderMaps.some(map => map.size > 0);
+    // Placeholder rules travel with the request, so every project gets token
+    // protection without configuring a per-project prompt.
+    const contextWithRules = withPlaceholderInstructions(
+      instructions ?? undefined,
+      hasPlaceholders
+    );
     const translationResult = await translateStrings({
       texts: normalizedStrings,
       target_language_codes: targetLanguages,
-      ...(instructions ? { context: instructions } : {}),
+      ...(contextWithRules ? { context: contextWithRules } : {}),
       ...(body.source_language
         ? { source_language_code: body.source_language }
         : {}),
@@ -350,34 +366,38 @@ translateRouter.post(
       ...translationResult.data.translations,
     };
 
-    // Restore original placeholder content from opaque tokens. The model does
-    // not always echo tokens back verbatim, so restoration repairs damaged
-    // brackets rather than leaving `{{__PH5__]]` in user-visible output.
-    for (const [langCode, translations] of Object.entries(
-      translationsByLanguage
-    )) {
-      translationsByLanguage[langCode] = translations.map((text, idx) => {
-        const map = placeholderMaps[idx];
-        if (!map) return text;
-        const restoration = restorePlaceholders(text, map);
-        if (
-          restoration.repaired > 0 ||
-          restoration.missing.length > 0 ||
-          restoration.duplicated.length > 0 ||
-          restoration.unknown.length > 0
-        ) {
-          console.warn(
-            `[translate] placeholder damage in ${langCode}[${idx}]:`,
-            JSON.stringify({
-              repaired: restoration.repaired,
-              missing: restoration.missing,
-              duplicated: restoration.duplicated,
-              unknown: restoration.unknown,
-            })
-          );
-        }
-        return restoration.text;
-      });
+    // Restore original placeholder content from opaque tokens, retrying any
+    // string the model returned with a broken placeholder set and falling back
+    // to source text if it stays broken. Nothing leaves here token-damaged.
+    const integrity = await restoreWithIntegrity(
+      {
+        translationsByLanguage,
+        maskedStrings: normalizedStrings,
+        placeholderMaps,
+        sourceStrings: processedStrings,
+        maxAttempts: PLACEHOLDER_RETRY_ATTEMPTS,
+        onWarn: message => console.warn(message),
+      },
+      async (maskedStrings, language, problem) => {
+        const retry = await translateStrings({
+          texts: maskedStrings,
+          target_language_codes: [language],
+          context: buildRetryInstructions(instructions ?? undefined, problem),
+          ...(body.source_language
+            ? { source_language_code: body.source_language }
+            : {}),
+        });
+        return retry.success && retry.data
+          ? (retry.data.translations[language] ?? null)
+          : null;
+      }
+    );
+    Object.assign(translationsByLanguage, integrity.translations);
+    if (integrity.summary.retried > 0 || integrity.summary.repaired > 0) {
+      console.log(
+        "[translate] placeholder integrity:",
+        JSON.stringify(integrity.summary)
+      );
     }
 
     // Post-process: unwrap {{term}} and replace with dictionary translations

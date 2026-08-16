@@ -18,6 +18,53 @@
 const SOURCE_PLACEHOLDER_RE = /\{\{([^}]+)\}\}/g;
 
 /**
+ * Rules describing the opaque tokens, appended to the caller's own context
+ * whenever a batch actually contains placeholders. Owning these here means
+ * every project gets token protection without configuring a per-project prompt.
+ */
+export const PLACEHOLDER_INSTRUCTIONS = [
+  "PLACEHOLDER TOKENS: some strings contain tokens shaped like {{__PH0__}}, {{__PH1__}}, {{__PH2__}}.",
+  "These are opaque machine markers, not words, and real values are substituted for them after you answer.",
+  "Copy every token into your translation character for character:",
+  "1. Keep the exact text __PH<number>__ inside the braces. Never translate it, transliterate it, change its capitalization, or renumber it.",
+  "2. Keep exactly two ASCII opening braces {{ before it and exactly two ASCII closing braces }} after it. Never emit ]] )) >> or the full-width forms ｛｛ ｝｝ 【 】. Output such as {{__PH5__]] is corrupt.",
+  "3. Use each token exactly once: the same tokens as the input, none dropped, none added, none duplicated.",
+  "You may move a token to wherever the target language's grammar requires; only its position may change.",
+  "Before answering, compare the tokens in each translation against the tokens in its input string and fix any that differ.",
+].join("\n");
+
+/**
+ * Sharper wording for a retry, naming what the previous attempt got wrong.
+ */
+export function buildRetryInstructions(
+  context: string | undefined,
+  problem: string
+): string {
+  return [
+    context,
+    PLACEHOLDER_INSTRUCTIONS,
+    `CRITICAL: a previous attempt at these strings was rejected because ${problem}.`,
+    "Reproduce every placeholder token exactly. This is more important than the wording of the translation.",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+/**
+ * Append the placeholder rules to a caller's context, but only when the batch
+ * actually contains tokens — otherwise the rules are noise.
+ */
+export function withPlaceholderInstructions(
+  context: string | undefined,
+  hasPlaceholders: boolean
+): string | undefined {
+  if (!hasPlaceholders) return context;
+  return context
+    ? `${context}\n\n${PLACEHOLDER_INSTRUCTIONS}`
+    : PLACEHOLDER_INSTRUCTIONS;
+}
+
+/**
  * Matches a `__PHn__` token plus whatever bracket-like characters the model
  * wrapped it in — including none at all. Covers ASCII `{}[]()<>` and the
  * full-width/CJK forms models reach for when the target language is CJK.
@@ -133,4 +180,29 @@ export function restorePlaceholders(
     .map(([token]) => token);
 
   return { text: result, restored, repaired, missing, duplicated, unknown };
+}
+
+/**
+ * Whether a restoration left the string wrong in a way repair cannot cover.
+ *
+ * Bracket damage and invented tokens are fully recoverable — the text that
+ * comes out is correct. A dropped or duplicated token is not: the placeholder
+ * set no longer matches the source, so the caller's interpolation would break.
+ */
+export function hasUnrecoverableDamage(result: RestoreResult): boolean {
+  return result.missing.length > 0 || result.duplicated.length > 0;
+}
+
+/** One-line description of what went wrong, for logs and retry prompts. */
+export function describeDamage(result: RestoreResult): string {
+  const parts: string[] = [];
+  if (result.missing.length > 0)
+    parts.push(`dropped ${result.missing.join(", ")}`);
+  if (result.duplicated.length > 0)
+    parts.push(`duplicated ${result.duplicated.join(", ")}`);
+  if (result.unknown.length > 0)
+    parts.push(`invented ${result.unknown.join(", ")}`);
+  if (result.repaired > 0)
+    parts.push(`${result.repaired} token(s) needed bracket repair`);
+  return parts.join("; ") || "no damage";
 }
