@@ -1,5 +1,10 @@
 # CLAUDE.md - whisperly_api
 
+> **Git policy — never auto-commit or auto-push.** Leave your work in the working tree.
+> Run `git commit`, `git push`, `gh pr create`, or `scripts/push_all.sh` **only when the user
+> explicitly asks in that turn**. Approval for an earlier change does not carry forward, and
+> finishing a task is not permission to commit it.
+
 ## Project Overview
 
 `@sudobility/whisperly_api` (v1.0.51) is the backend API server for the Whisperly localization SaaS platform. Built with Hono on Bun, it provides REST endpoints for project management, dictionary/glossary management, translation services, analytics, entity/organization management, and subscription-based rate limiting.
@@ -341,3 +346,7 @@ APP_URL=                              # App URL for email links (default: http:/
 ### Dev
 - `typescript` (^5.9.3), `vitest` (^4.0.16), `drizzle-kit` (^0.31.8)
 - `eslint` (^9.39.2), `prettier` (^3.7.4)
+
+## Git Workflow
+
+- Do not use feature branches for code changes. Always stay on the current branch.
