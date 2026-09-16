@@ -81,8 +81,12 @@ bun run typecheck    # TypeScript type checking (tsc --noEmit)
 bun run lint         # ESLint (src directory)
 bun run format       # Prettier format (src directory)
 bun run format:check # Prettier check
-bun run test         # Run tests in watch mode
-bun run test:run     # Run tests once
+bun run test         # Unit tests, vitest. Never touches a database; this is what CI runs.
+bun run test:watch   # Watch mode
+bun run test:db      # Database tests (*.db.test.ts), vitest. MANUAL -- never run in CI.
+                     # Requires TEST_DATABASE_URL pointing at localhost.
+                     # No *.db.test.ts files exist yet, so this exits 1 with
+                     # "No test files found" -- expected, not a failure.
 
 # Database
 bun run db:generate  # Generate Drizzle migrations
@@ -104,7 +108,10 @@ bun run db:studio    # Open Drizzle Studio
 ## Testing Notes
 
 - Framework: Vitest (node environment), tests in `tests/` directory
-- Mocking strategy: Vitest `resolve.alias` maps `@sudobility/ratelimit_service` and `@sudobility/auth_service` to test mocks
+- Mocking strategy: Vitest `resolve.alias` maps `@sudobility/ratelimit_service`, `@sudobility/auth_service` and `@sudobility/entity_service` to test mocks. These aliases are duplicated in **both** `vitest.config.ts` and `vitest.db.config.ts`; a database suite without them fails to resolve those imports.
+- **Two configs, one runner.** `bun run test` excludes `**/*.db.test.ts`, so CI cannot reach a database. `bun run test:db` collects only those files and is manual.
+- **`TEST_DATABASE_URL`, not `DATABASE_URL`.** `tests/setup.db.ts` requires it to point at exactly `localhost` (`127.0.0.1` refused). `tests/setup.ts` deletes `DATABASE_URL` outright.
+- `@sudobility/subscription_service` is inlined via `server.deps.inline` -- unlike the three above it has no test mock, and it ships extensionless relative imports Node's ESM resolver rejects.
 
 ## API Routes
 
@@ -288,7 +295,8 @@ Additional features:
 
 ```bash
 # Required
-DATABASE_URL=postgres://...           # PostgreSQL connection
+DATABASE_URL=postgres://...           # PostgreSQL connection (application only; tests delete it)
+TEST_DATABASE_URL=postgresql://localhost:5432/whisperly_test  # test:db only; must be localhost
 FIREBASE_PROJECT_ID=...               # Firebase project
 FIREBASE_CLIENT_EMAIL=...             # Firebase service account email
 FIREBASE_PRIVATE_KEY=...              # Firebase private key

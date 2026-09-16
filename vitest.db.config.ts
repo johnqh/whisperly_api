@@ -4,11 +4,11 @@ export default defineConfig({
   test: {
     globals: false,
     environment: "node",
-    setupFiles: ["./tests/setup.ts"],
-    include: ["tests/**/*.test.ts"],
-    // Database-backed suites are never collected here. This is what keeps CI
-    // off a database — not a runtime skip inside the tests.
-    exclude: ["**/node_modules/**", "**/dist/**", "**/*.db.test.ts"],
+    setupFiles: ["./tests/setup.db.ts"],
+    include: ["**/*.db.test.ts"],
+    exclude: ["**/node_modules/**", "**/dist/**"],
+    // One database, shared across files. Parallel files corrupt each other.
+    fileParallelism: false,
     deps: {
       interopDefault: true,
     },

@@ -1,6 +1,6 @@
 {
   "name": "@sudobility/whisperly_api",
-  "version": "1.0.79",
+  "version": "1.0.80",
   "module": "src/index.ts",
   "type": "module",
   "private": true,
@@ -8,19 +8,21 @@
   "scripts": {
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",
-    "test": "bunx vitest",
-    "test:run": "bunx vitest run",
+    "test:unit": "vitest run",
     "lint": "bunx eslint src",
     "typecheck": "bunx tsc --noEmit",
     "format": "bunx prettier --write src",
     "format:check": "bunx prettier --check src",
-    "verify": "bun run typecheck && bun run lint && bun run test:run",
+    "verify": "bun run typecheck && bun run lint && bun run test:unit",
     "db:generate": "bunx --bun drizzle-kit generate",
     "db:migrate": "bunx --bun drizzle-kit migrate",
     "db:push": "bunx --bun drizzle-kit push",
-    "db:studio": "bunx --bun drizzle-kit studio"
+    "db:studio": "bunx --bun drizzle-kit studio",
+    "test:watch": "vitest",
+    "test:db": "vitest run --config vitest.db.config.ts"
   },
   "devDependencies": {
+    "@sudobility/test-db-guard": "1.0.2",
     "@types/bun": "latest",
     "@types/node": "^24.10.1",
     "@typescript-eslint/eslint-plugin": "^8.50.0",
@@ -43,7 +45,7 @@
     "@sudobility/ratelimit_service": "^1.0.39",
     "@sudobility/subscription_service": "^1.0.23",
     "@sudobility/types": "^1.9.67",
-    "@sudobility/whisperly_types": "^1.0.36",
+    "@sudobility/whisperly_types": "^1.0.37",
     "drizzle-orm": "^0.45.0",
     "firebase-admin": "^13.6.0",
     "hono": "^4.10.7",

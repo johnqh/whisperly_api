@@ -1,15 +1,23 @@
-// Test setup file for Bun test runner
-// This file is preloaded before tests run (configured in bunfig.toml)
+/**
+ * Unit-test setup. Loaded by `bun run test` — the script CI runs.
+ *
+ * No database is reachable from here: the guard deletes DATABASE_URL, and
+ * vitest.config.ts excludes every *.db.test.ts file from collection.
+ *
+ * Replaces a block of `process.env.X = process.env.X || "..."` defaults. Those
+ * applied only when a variable was unset, so an exported production
+ * DATABASE_URL won. Assignments are now unconditional: tests define their
+ * environment rather than inheriting it.
+ */
+import { scrubDatabaseUrl } from "@sudobility/test-db-guard";
 
-// Set test environment
 process.env.NODE_ENV = "test";
 process.env.BUN_ENV = "test";
 
-// Mock environment variables for testing
-process.env.DATABASE_URL = process.env.DATABASE_URL || "postgresql://localhost:5432/whisperly_test";
-process.env.FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || "test-project";
-process.env.FIREBASE_CLIENT_EMAIL = process.env.FIREBASE_CLIENT_EMAIL || "test@test.iam.gserviceaccount.com";
-process.env.FIREBASE_PRIVATE_KEY = process.env.FIREBASE_PRIVATE_KEY || "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----";
-process.env.TRANSLATION_SERVICE_URL = process.env.TRANSLATION_SERVICE_URL || "http://localhost:8080/translate";
+scrubDatabaseUrl();
 
-console.log("Test environment initialized");
+process.env.FIREBASE_PROJECT_ID = "test-project";
+process.env.FIREBASE_CLIENT_EMAIL = "test@test.iam.gserviceaccount.com";
+process.env.FIREBASE_PRIVATE_KEY =
+  "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----";
+process.env.TRANSLATION_SERVICE_URL = "http://localhost:8080/translate";
