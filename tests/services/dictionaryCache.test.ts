@@ -7,6 +7,7 @@ import {
   serializeCache,
   clearAllCaches,
   getCacheStats,
+  normalizeDictionaryText,
 } from "../../src/services/dictionaryCache";
 
 /**
@@ -219,6 +220,45 @@ describe("dictionaryCache", () => {
 
       expect(matches).toHaveLength(1);
       expect(matches[0]!.start).toBe("{{sudoku}} means ".length);
+    });
+  });
+
+  describe("dictionary casing", () => {
+    test("normalizes ordinary dictionary text but preserves all-caps terms", () => {
+      expect(normalizeDictionaryText("Pitch")).toBe("pitch");
+      expect(normalizeDictionaryText("Altura")).toBe("altura");
+      expect(normalizeDictionaryText("USa")).toBe("USa");
+      expect(normalizeDictionaryText("PITCH")).toBe("PITCH");
+    });
+
+    test("applies source casing to dictionary replacements", () => {
+      const cache = buildMockCache([
+        ["dict-1", { en: "pitch", es: "altura" }],
+      ]);
+
+      expect(unwrapAndTranslate("{{pitch}}", findDictionaryTerms("pitch", cache), "es", cache)).toBe(
+        "altura"
+      );
+      expect(unwrapAndTranslate("{{Pitch}}", findDictionaryTerms("Pitch", cache), "es", cache)).toBe(
+        "Altura"
+      );
+      expect(unwrapAndTranslate("{{PITCH}}", findDictionaryTerms("PITCH", cache), "es", cache)).toBe(
+        "ALTURA"
+      );
+    });
+
+    test("removes placeholder spacing for languages without word separators", () => {
+      const cache = buildMockCache([
+        ["dict-1", { en: "pitch", es: "altura", zh: "高度" }],
+      ]);
+      const matches = findDictionaryTerms("pitch", cache);
+
+      expect(unwrapAndTranslate("你好 {{pitch}} 世界", matches, "zh", cache)).toBe(
+        "你好高度世界"
+      );
+      expect(unwrapAndTranslate("Hallo {{pitch}} Welt", matches, "es", cache)).toBe(
+        "Hallo altura Welt"
+      );
     });
   });
 

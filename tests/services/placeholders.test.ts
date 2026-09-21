@@ -215,7 +215,7 @@ describe("full translate pipeline", () => {
     );
 
     expect(result).toBe(
-      "{{levelTitle}} {{sudoku}} 教练 - {{techniques}} | 数道场"
+      "{{levelTitle}} {{sudoku}} 教练 - {{techniques}} |数道场"
     );
     expect(result).not.toContain("数独");
   });
@@ -228,7 +228,7 @@ describe("full translate pipeline", () => {
       masked => masked.replace("Play", "玩").replace("puzzles", "谜题")
     );
 
-    expect(result).toBe("玩 {{count}} 数独 谜题");
+    expect(result).toBe("玩 {{count}}数独谜题");
   });
 
   test("survives a model that damages the token brackets", () => {

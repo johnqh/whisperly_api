@@ -39,6 +39,65 @@ export interface TermMatch {
   dictionaryId: string;
 }
 
+/**
+ * Normalize dictionary text for storage/display.
+ * Preserve terms with intentional uppercase styling (two or more uppercase
+ * letters), but remove sentence/title casing from ordinary terms.
+ */
+export function normalizeDictionaryText(text: string): string {
+  const letters = Array.from(text).filter(character =>
+    /\p{L}/u.test(character)
+  );
+  const uppercaseCount = letters.filter(
+    character =>
+      character === character.toUpperCase() &&
+      character !== character.toLowerCase()
+  ).length;
+  if (letters.length === 0 || uppercaseCount >= 2) {
+    return text;
+  }
+  return text.toLowerCase();
+}
+
+/** Apply the source term's basic casing pattern to a dictionary translation. */
+function applyDictionaryCase(source: string, replacement: string): string {
+  const sourceCasedCharacters = source.match(/[A-Za-zÀ-ÖØ-öø-ÿ]/g);
+  if (!sourceCasedCharacters || sourceCasedCharacters.length === 0) {
+    return replacement;
+  }
+
+  if (
+    sourceCasedCharacters.every(
+      character => character === character.toUpperCase()
+    )
+  ) {
+    return replacement.toUpperCase();
+  }
+
+  const firstCasedIndex = replacement.search(/[A-Za-zÀ-ÖØ-öø-ÿ]/);
+  const firstSourceCharacter = sourceCasedCharacters[0]!;
+  if (
+    firstSourceCharacter === firstSourceCharacter.toUpperCase() &&
+    firstCasedIndex >= 0
+  ) {
+    return (
+      replacement.slice(0, firstCasedIndex) +
+      replacement[firstCasedIndex]!.toUpperCase() +
+      replacement.slice(firstCasedIndex + 1)
+    );
+  }
+
+  return replacement;
+}
+
+/** Languages whose writing systems generally do not separate words with spaces. */
+const NO_WORD_SPACING_LANGUAGES = new Set(["zh", "ja", "th", "lo", "km", "my"]);
+
+function usesWordSpacing(language: string): boolean {
+  const baseLanguage = language.toLowerCase().split(/[-_]/, 1)[0];
+  return !NO_WORD_SPACING_LANGUAGES.has(baseLanguage);
+}
+
 // =============================================================================
 // Cache Storage
 // =============================================================================
@@ -100,7 +159,7 @@ async function loadProjectCache(
     }
     dictionary_map
       .get(entry.dictionary_id)!
-      .set(entry.language_code, entry.text);
+      .set(entry.language_code, normalizeDictionaryText(entry.text));
 
     // Build text_map: lowercase_text -> dictionary_id
     // All language variations are keys (to detect terms in any input language)
@@ -309,17 +368,27 @@ export function unwrapAndTranslate(
 
     if (langMap && langMap.has(targetLanguage)) {
       // Use dictionary translation
-      replacement = langMap.get(targetLanguage)!;
+      replacement = applyDictionaryCase(
+        match.term,
+        langMap.get(targetLanguage)!
+      );
     } else {
       // No translation available - keep original term (without brackets)
       replacement = match.term;
     }
 
-    // Replace the bracketed term with the translation
-    result =
-      result.slice(0, pos) +
-      replacement +
-      result.slice(pos + bracketedTerm.length);
+    // Replace the bracketed term with the translation. Models sometimes keep
+    // spaces around opaque dictionary placeholders; remove those spaces for
+    // writing systems that do not normally separate words with spaces.
+    const before = result.slice(0, pos);
+    const after = result.slice(pos + bracketedTerm.length);
+    const normalizedBefore = usesWordSpacing(targetLanguage)
+      ? before
+      : before.replace(/\s+$/u, "");
+    const normalizedAfter = usesWordSpacing(targetLanguage)
+      ? after
+      : after.replace(/^\s+/u, "");
+    result = normalizedBefore + replacement + normalizedAfter;
   }
 
   return result;

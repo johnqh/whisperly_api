@@ -22,7 +22,10 @@ import {
   type DictionarySearchResponse,
   type DictionaryListItem,
 } from "@sudobility/whisperly_types";
-import { invalidateProjectCache } from "../services/dictionaryCache";
+import {
+  invalidateProjectCache,
+  normalizeDictionaryText,
+} from "../services/dictionaryCache";
 import {
   getEntityWithPermission,
   getEntityErrorStatus,
@@ -182,7 +185,11 @@ dictionaryRouter.post(
   async c => {
     const userId = c.get("firebaseUser").uid;
     const { entitySlug, projectId } = c.req.valid("param");
-    const translations = c.req.valid("json") as DictionaryTranslations;
+    const translations = Object.fromEntries(
+      Object.entries(c.req.valid("json") as DictionaryTranslations).map(
+        ([languageCode, text]) => [languageCode, normalizeDictionaryText(text)]
+      )
+    ) as DictionaryTranslations;
 
     const result = await getEntityWithPermission(entitySlug, userId, true);
     if (result.error !== undefined) {
@@ -314,7 +321,11 @@ dictionaryRouter.put(
   async c => {
     const userId = c.get("firebaseUser").uid;
     const { entitySlug, projectId, dictionaryId } = c.req.valid("param");
-    const translations = c.req.valid("json") as DictionaryTranslations;
+    const translations = Object.fromEntries(
+      Object.entries(c.req.valid("json") as DictionaryTranslations).map(
+        ([languageCode, text]) => [languageCode, normalizeDictionaryText(text)]
+      )
+    ) as DictionaryTranslations;
 
     const result = await getEntityWithPermission(entitySlug, userId, true);
     if (result.error !== undefined) {
