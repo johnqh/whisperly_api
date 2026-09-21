@@ -31,6 +31,7 @@ import {
   findDictionaryTerms,
   wrapTermsWithBrackets,
   unwrapAndTranslate,
+  removeWordSpacing,
   isCacheEmpty,
   serializeCache,
   type TermMatch,
@@ -423,6 +424,17 @@ translateRouter.post(
       // Include cache for debugging only in test mode
       const cache = await getProjectCache(entity.id, project.id);
       dictionaryCacheDebug = serializeCache(cache);
+    }
+
+    // Remove whitespace from languages whose writing systems do not separate
+    // words with spaces. This also handles spaces around interpolation params
+    // and punctuation when no dictionary term was present.
+    for (const [langCode, translations] of Object.entries(
+      translationsByLanguage
+    )) {
+      translationsByLanguage[langCode] = translations.map(text =>
+        removeWordSpacing(text, langCode)
+      );
     }
 
     const response: TranslationResponse = {

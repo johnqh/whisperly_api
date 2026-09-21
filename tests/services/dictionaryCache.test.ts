@@ -8,6 +8,7 @@ import {
   clearAllCaches,
   getCacheStats,
   normalizeDictionaryText,
+  removeWordSpacing,
 } from "../../src/services/dictionaryCache";
 
 /**
@@ -259,6 +260,16 @@ describe("dictionaryCache", () => {
       expect(unwrapAndTranslate("Hallo {{pitch}} Welt", matches, "es", cache)).toBe(
         "Hallo altura Welt"
       );
+    });
+
+    test("removes spaces even when no dictionary term is restored", () => {
+      expect(
+        removeWordSpacing(
+          "{{levelTitle}} {{sudoku}} 教练 - {{techniques}} | 数道场",
+          "zh"
+        )
+      ).toBe("{{levelTitle}}{{sudoku}}教练-{{techniques}}|数道场");
+      expect(removeWordSpacing("Hello world", "en")).toBe("Hello world");
     });
   });
 

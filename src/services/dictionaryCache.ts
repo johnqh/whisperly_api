@@ -98,6 +98,11 @@ function usesWordSpacing(language: string): boolean {
   return !NO_WORD_SPACING_LANGUAGES.has(baseLanguage);
 }
 
+/** Remove word-separation whitespace from a translated no-space language. */
+export function removeWordSpacing(text: string, language: string): string {
+  return usesWordSpacing(language) ? text : text.replace(/\s+/gu, "");
+}
+
 // =============================================================================
 // Cache Storage
 // =============================================================================
